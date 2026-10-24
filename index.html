@@ -4,412 +4,101 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Dubai Sky Battle 3D</title>
-    <!-- Google Fonts for Dubai Luxury Cyber Styling -->
     <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@600;800;900&family=Rajdhani:wght@600;700&display=swap" rel="stylesheet">
-    <!-- Three.js 3D Engine -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-    <!-- PeerJS WebRTC P2P Multiplayer -->
     <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; }
-        body { 
-            margin: 0; 
-            background: #020712; 
-            color: #e0f8ff; 
-            font-family: 'Rajdhani', sans-serif; 
-            overflow: hidden; 
-            touch-action: none;
-            user-select: none;
-            width: 100vw;
-            height: 100vh;
-        }
-
-        #gameCanvas {
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100vw;
-            height: 100vh;
-            display: block;
-            z-index: 1;
-        }
-
-        /* Dubai Luxury Gold & Midnight Glass Menu */
+        body { margin: 0; background: #020712; color: #e0f8ff; font-family: 'Rajdhani', sans-serif; overflow: hidden; touch-action: none; user-select: none; width: 100vw; height: 100vh; }
+        #gameCanvas { position: absolute; top: 0; left: 0; width: 100vw; height: 100vh; display: block; z-index: 1; }
         #menu { 
-            position: absolute; 
-            top: 50%; 
-            left: 50%; 
-            transform: translate(-50%, -50%); 
-            text-align: center; 
+            position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); text-align: center; 
             background: radial-gradient(circle at 50% 0%, rgba(18, 32, 52, 0.96), rgba(3, 8, 18, 0.98));
-            backdrop-filter: blur(16px);
-            padding: 35px 40px; 
-            border: 2px solid #ffd700; 
-            border-radius: 12px; 
-            z-index: 100; 
-            box-shadow: 0 0 45px rgba(255, 215, 0, 0.4), inset 0 0 25px rgba(0, 255, 136, 0.15);
-            max-width: 460px;
-            width: 90%;
+            backdrop-filter: blur(16px); padding: 35px 40px; border: 2px solid #ffd700; border-radius: 12px; 
+            z-index: 100; box-shadow: 0 0 45px rgba(255, 215, 0, 0.4); max-width: 460px; width: 90%;
         }
-
-        .dubai-emblem {
-            font-family: 'Orbitron', sans-serif;
-            font-size: 11px;
-            letter-spacing: 4px;
-            color: #00ff88;
-            text-shadow: 0 0 10px rgba(0, 255, 136, 0.6);
-            margin-bottom: 6px;
-        }
-
-        .glow-gold { 
-            font-family: 'Orbitron', sans-serif;
-            font-size: 30px;
-            letter-spacing: 4px;
-            background: linear-gradient(135deg, #ffffff 10%, #ffd700 50%, #ff9900 100%);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            font-weight: 900;
-        }
-
-        .skyline-badge {
-            font-size: 10px;
-            letter-spacing: 2px;
-            color: #00ffcc;
-            margin: 6px 0 20px 0;
-            opacity: 0.9;
-        }
-
+        .dubai-emblem { font-family: 'Orbitron', sans-serif; font-size: 11px; letter-spacing: 4px; color: #00ff88; text-shadow: 0 0 10px rgba(0, 255, 136, 0.6); margin-bottom: 6px; }
+        .glow-gold { font-family: 'Orbitron', sans-serif; font-size: 30px; letter-spacing: 4px; background: linear-gradient(135deg, #ffffff 10%, #ffd700 50%, #ff9900 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; font-weight: 900; }
+        .skyline-badge { font-size: 10px; letter-spacing: 2px; color: #00ffcc; margin: 6px 0 20px 0; }
         .input-block { text-align: left; margin-bottom: 16px; }
         .input-block label { display: block; font-size: 12px; letter-spacing: 2px; color: #ffd700; margin-bottom: 5px; }
-
-        input { 
-            width: 100%;
-            padding: 12px 14px; 
-            font-size: 18px; 
-            font-family: 'Orbitron', monospace;
-            text-transform: uppercase; 
-            text-align: center; 
-            letter-spacing: 3px; 
-            background: rgba(2, 6, 14, 0.85); 
-            color: #ffd700; 
-            border: 1px solid #ffd700; 
-            border-radius: 6px;
-            outline: none;
-            transition: 0.3s;
-        }
+        input { width: 100%; padding: 12px 14px; font-size: 18px; font-family: 'Orbitron', monospace; text-transform: uppercase; text-align: center; letter-spacing: 3px; background: rgba(2, 6, 14, 0.85); color: #ffd700; border: 1px solid #ffd700; border-radius: 6px; outline: none; }
         input:focus { border-color: #00ff88; box-shadow: 0 0 18px rgba(0, 255, 136, 0.6); }
-
         .action-grid { display: flex; flex-direction: column; gap: 10px; }
-
-        button { 
-            font-family: 'Orbitron', sans-serif;
-            padding: 13px 20px; 
-            font-size: 14px; 
-            cursor: pointer; 
-            border: none; 
-            border-radius: 6px;
-            font-weight: 700; 
-            letter-spacing: 2px;
-            transition: 0.25s all; 
-        }
-        .gold-btn {
-            background: linear-gradient(135deg, #ffd700, #ff9900);
-            color: #050a12;
-            box-shadow: 0 0 20px rgba(255, 215, 0, 0.35);
-        }
+        button { font-family: 'Orbitron', sans-serif; padding: 13px 20px; font-size: 14px; cursor: pointer; border: none; border-radius: 6px; font-weight: 700; letter-spacing: 2px; transition: 0.25s all; }
+        .gold-btn { background: linear-gradient(135deg, #ffd700, #ff9900); color: #050a12; box-shadow: 0 0 20px rgba(255, 215, 0, 0.35); }
         .gold-btn:hover { transform: translateY(-2px); box-shadow: 0 0 30px rgba(255, 215, 0, 0.7); }
-
-        .emerald-btn {
-            background: linear-gradient(135deg, #00ff88, #00b368);
-            color: #020b08;
-            white-space: nowrap;
-        }
-        .emerald-btn:hover { box-shadow: 0 0 25px rgba(0, 255, 136, 0.7); transform: translateY(-2px); }
-
-        .or-separator {
-            position: relative;
-            border-top: 1px solid rgba(255, 215, 0, 0.25);
-            margin: 6px 0;
-        }
-        .or-separator span {
-            position: absolute;
-            top: -9px;
-            left: 50%;
-            transform: translateX(-50%);
-            background: #091526;
-            padding: 0 10px;
-            font-size: 10px;
-            color: #ffd700;
-        }
-
+        .emerald-btn { background: linear-gradient(135deg, #00ff88, #00b368); color: #020b08; white-space: nowrap; }
+        .or-separator { position: relative; border-top: 1px solid rgba(255, 215, 0, 0.25); margin: 6px 0; }
+        .or-separator span { position: absolute; top: -9px; left: 50%; transform: translateX(-50%); background: #091526; padding: 0 10px; font-size: 10px; color: #ffd700; }
         .join-row { display: flex; gap: 8px; }
         .join-row input { width: 45%; font-size: 22px; letter-spacing: 6px; }
         .join-row button { width: 55%; }
-
         #statusMsg { color: #88c0d0; font-size: 11px; letter-spacing: 1px; margin-top: 15px; }
-
-        /* Host 4-Digit Code Pop-up */
-        #hostModal {
-            display: none;
-            position: absolute;
-            top: 0; left: 0; width: 100vw; height: 100vh;
-            background: rgba(0, 4, 10, 0.85);
-            backdrop-filter: blur(10px);
-            z-index: 150;
-            justify-content: center;
-            align-items: center;
-        }
-        .modal-box {
-            background: #081422;
-            border: 2px solid #ffd700;
-            border-radius: 12px;
-            padding: 30px 40px;
-            text-align: center;
-            box-shadow: 0 0 40px rgba(255, 215, 0, 0.5);
-            max-width: 400px;
-            width: 90%;
-        }
+        #hostModal { display: none; position: absolute; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0, 4, 10, 0.85); backdrop-filter: blur(10px); z-index: 150; justify-content: center; align-items: center; }
+        .modal-box { background: #081422; border: 2px solid #ffd700; border-radius: 12px; padding: 30px 40px; text-align: center; box-shadow: 0 0 40px rgba(255, 215, 0, 0.5); max-width: 400px; width: 90%; }
         .modal-header { font-family: 'Orbitron', sans-serif; color: #00ff88; font-size: 13px; letter-spacing: 3px; margin-bottom: 10px; }
-        #generatedCodeDisplay {
-            font-family: 'Orbitron', monospace;
-            font-size: 50px;
-            font-weight: 900;
-            letter-spacing: 10px;
-            color: #ffd700;
-            text-shadow: 0 0 25px rgba(255, 215, 0, 0.8);
-            background: rgba(0,0,0,0.5);
-            border: 1px dashed #ffd700;
-            border-radius: 8px;
-            padding: 15px 0;
-            margin: 15px 0;
-        }
+        #generatedCodeDisplay { font-family: 'Orbitron', monospace; font-size: 50px; font-weight: 900; letter-spacing: 10px; color: #ffd700; text-shadow: 0 0 25px rgba(255, 215, 0, 0.8); background: rgba(0,0,0,0.5); border: 1px dashed #ffd700; border-radius: 8px; padding: 15px 0; margin: 15px 0; }
         .copy-btn { background: rgba(255, 215, 0, 0.15); border: 1px solid #ffd700; color: #ffd700; padding: 8px 18px; font-size: 13px; }
-        .copy-btn:hover { background: #ffd700; color: #000; }
-
-        /* Cockpit HUD */
-        #hud {
-            position: absolute;
-            top: 15px;
-            left: 20px;
-            pointer-events: none;
-            z-index: 10;
-        }
-        #squadBadge {
-            font-family: 'Orbitron', monospace;
-            font-size: 16px;
-            font-weight: 700;
-            color: #ffd700;
-            background: rgba(4, 12, 22, 0.85);
-            border-left: 3px solid #ffd700;
-            padding: 5px 12px;
-            text-shadow: 0 0 10px rgba(255, 215, 0, 0.6);
-            display: inline-block;
-        }
-        #atcChatter {
-            font-size: 12px;
-            color: #00ff88;
-            letter-spacing: 1.5px;
-            background: rgba(0,0,0,0.6);
-            padding: 3px 8px;
-            margin-top: 5px;
-            max-width: 420px;
-        }
+        #hud { position: absolute; top: 15px; left: 20px; pointer-events: none; z-index: 10; }
+        #squadBadge { font-family: 'Orbitron', monospace; font-size: 16px; font-weight: 700; color: #ffd700; background: rgba(4, 12, 22, 0.85); border-left: 3px solid #ffd700; padding: 5px 12px; text-shadow: 0 0 10px rgba(255, 215, 0, 0.6); display: inline-block; }
+        #atcChatter { font-size: 12px; color: #00ff88; letter-spacing: 1.5px; background: rgba(0,0,0,0.6); padding: 3px 8px; margin-top: 5px; max-width: 420px; }
         .bar-title { font-size: 11px; color: #00ffcc; letter-spacing: 1.5px; margin-top: 10px; }
-        #healthBarBox {
-            width: 220px;
-            height: 12px;
-            border: 1px solid #00ffcc;
-            background: rgba(0,0,0,0.7);
-            margin-top: 2px;
-        }
-        #healthBar {
-            width: 100%;
-            height: 100%;
-            background: linear-gradient(90deg, #00ff88, #00d9ff);
-            box-shadow: 0 0 10px #00ff88;
-            transition: width 0.1s ease-out;
-        }
-        #speedGauge, #altGauge, #landmarkBeacon {
-            margin-top: 4px;
-            font-size: 14px;
-            color: #ffd700;
-            text-shadow: 0 0 8px rgba(255, 215, 0, 0.5);
-            font-weight: 600;
-        }
+        #healthBarBox { width: 220px; height: 12px; border: 1px solid #00ffcc; background: rgba(0,0,0,0.7); margin-top: 2px; }
+        #healthBar { width: 100%; height: 100%; background: linear-gradient(90deg, #00ff88, #00d9ff); box-shadow: 0 0 10px #00ff88; transition: width 0.1s ease-out; }
+        #speedGauge, #altGauge, #landmarkBeacon { margin-top: 4px; font-size: 14px; color: #ffd700; text-shadow: 0 0 8px rgba(255, 215, 0, 0.5); font-weight: 600; }
         #landmarkBeacon { color: #00ffcc; font-size: 13px; letter-spacing: 1.5px; }
-        .controls-hint {
-            margin-top: 8px;
-            font-size: 11px;
-            color: #ccc;
-            background: rgba(0,0,0,0.6);
-            padding: 4px 8px;
-            max-width: 440px;
-        }
-
-        /* 3D Crosshair */
-        #crosshair {
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            width: 70px;
-            height: 70px;
-            pointer-events: none;
-            z-index: 10;
-        }
-        .cross-diamond {
-            position: absolute;
-            width: 100%;
-            height: 100%;
-            border: 1.5px solid rgba(255, 215, 0, 0.5);
-            transform: rotate(45deg);
-        }
-        .cross-dot {
-            position: absolute;
-            top: 50%; left: 50%;
-            transform: translate(-50%, -50%);
-            width: 4px; height: 4px;
-            background: #00ff88;
-            border-radius: 50%;
-            box-shadow: 0 0 8px #00ff88;
-        }
+        .controls-hint { margin-top: 8px; font-size: 11px; color: #ccc; background: rgba(0,0,0,0.6); padding: 4px 8px; max-width: 440px; }
+        #crosshair { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 70px; height: 70px; pointer-events: none; z-index: 10; }
+        .cross-diamond { position: absolute; width: 100%; height: 100%; border: 1.5px solid rgba(255, 215, 0, 0.5); transform: rotate(45deg); }
+        .cross-dot { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 4px; height: 4px; background: #00ff88; border-radius: 50%; box-shadow: 0 0 8px #00ff88; }
         .wing { position: absolute; top: 50%; width: 14px; height: 2px; background: #ffd700; }
-        .wing.left { left: -12px; }
-        .wing.right { right: -12px; }
-        #lockState {
-            position: absolute;
-            bottom: -22px;
-            left: 50%;
-            transform: translateX(-50%);
-            font-family: 'Orbitron', monospace;
-            font-size: 10px;
-            color: #ffd700;
-            white-space: nowrap;
-            letter-spacing: 1px;
-        }
-
-        #killFeed {
-            position: absolute;
-            top: 15px;
-            right: 20px;
-            width: 320px;
-            text-align: right;
-            pointer-events: none;
-            z-index: 50;
-        }
-        .kill-msg {
-            color: #ff3366;
-            font-size: 13px;
-            font-weight: 700;
-            margin-bottom: 5px;
-            background: rgba(10, 0, 5, 0.75);
-            border-right: 3px solid #ff3366;
-            padding: 4px 8px;
-        }
-
-        #notification {
-            position: absolute;
-            top: 22%;
-            width: 100%;
-            text-align: center;
-            font-family: 'Orbitron', sans-serif;
-            font-size: 26px;
-            font-weight: 900;
-            color: #ffd700;
-            text-shadow: 0 0 20px rgba(255, 215, 0, 0.9);
-            pointer-events: none;
-            z-index: 60;
-            opacity: 0;
-            transition: opacity 0.3s;
-        }
-
-        /* Admin / Cheats */
-        #settingsCog {
-            position: absolute; bottom: 15px; right: 15px;
-            font-size: 32px; cursor: pointer; z-index: 101;
-            background: rgba(5, 12, 22, 0.85); border: 1px solid #ffd700;
-            border-radius: 50%; padding: 8px;
-        }
-        #adminPanel { 
-            display: none; position: absolute; bottom: 80px; right: 15px; 
-            background: rgba(5, 12, 22, 0.96); padding: 18px; 
-            border: 2px solid #ffd700; border-radius: 8px; width: 250px; z-index: 100;
-            box-shadow: 0 0 30px rgba(255, 215, 0, 0.3);
-        }
+        .wing.left { left: -12px; } .wing.right { right: -12px; }
+        #lockState { position: absolute; bottom: -22px; left: 50%; transform: translateX(-50%); font-family: 'Orbitron', monospace; font-size: 10px; color: #ffd700; white-space: nowrap; }
+        #killFeed { position: absolute; top: 15px; right: 20px; width: 320px; text-align: right; pointer-events: none; z-index: 50; }
+        .kill-msg { color: #ff3366; font-size: 13px; font-weight: 700; margin-bottom: 5px; background: rgba(10, 0, 5, 0.75); border-right: 3px solid #ff3366; padding: 4px 8px; }
+        #notification { position: absolute; top: 22%; width: 100%; text-align: center; font-family: 'Orbitron', sans-serif; font-size: 26px; font-weight: 900; color: #ffd700; text-shadow: 0 0 20px rgba(255, 215, 0, 0.9); pointer-events: none; z-index: 60; opacity: 0; transition: opacity 0.3s; }
+        #settingsCog { position: absolute; bottom: 15px; right: 15px; font-size: 32px; cursor: pointer; z-index: 101; background: rgba(5, 12, 22, 0.85); border: 1px solid #ffd700; border-radius: 50%; padding: 8px; }
+        #adminPanel { display: none; position: absolute; bottom: 80px; right: 15px; background: rgba(5, 12, 22, 0.96); padding: 18px; border: 2px solid #ffd700; border-radius: 8px; width: 250px; z-index: 100; box-shadow: 0 0 30px rgba(255, 215, 0, 0.3); }
         .cheat-row { margin-bottom: 6px; }
-        .cheat-btn {
-            background: #0f1c2e; color: #fff; font-size: 11px;
-            padding: 8px; width: 100%; border: 1px solid #224466; border-radius: 4px;
-        }
+        .cheat-btn { background: #0f1c2e; color: #fff; font-size: 11px; padding: 8px; width: 100%; border: 1px solid #224466; border-radius: 4px; }
         .cheat-btn:hover { background: #ffd700; color: #000; }
         .cheat-btn.active { background: #ff3366; color: white; border-color: white; }
-
-        /* Touch Controls */
-        #touchControls {
-            display: none;
-            position: absolute; bottom: 15px; left: 0; width: 100%;
-            height: 160px; z-index: 90;
-            pointer-events: none;
-        }
-        #stickLeft { position: absolute; bottom: 10px; left: 15px; pointer-events: auto; }
-        #stickRight { position: absolute; bottom: 10px; right: 15px; pointer-events: auto; display: flex; align-items: flex-end; gap: 12px; }
-        .touch-row { display: flex; justify-content: center; }
-        .t-btn {
-            width: 52px; height: 52px; background: rgba(5, 20, 35, 0.7);
-            border: 1px solid #00ff88; color: #00ff88; font-size: 20px;
-            border-radius: 8px; margin: 2px;
-        }
-        .round { border-radius: 50%; }
-        .big { width: 72px; height: 72px; font-size: 30px; background: rgba(255, 60, 60, 0.4); border-color: #ff3366; color: white; }
-        .sub-actions { display: flex; flex-direction: column; gap: 10px; }
-
-        @media (pointer: coarse) { #touchControls { display: block; } }
     </style>
 </head>
 <body>
-
-    <!-- Main Dubai Scramble Menu -->
     <div id="menu">
         <div class="dubai-emblem">دبي • DUBAI AIR DEFENSE</div>
         <h1 class="glow-gold">SKY PATROL 3D</h1>
         <div class="skyline-badge">BURJ KHALIFA • SHEIKH ZAYED RD • BURJ AL ARAB</div>
-
         <div class="input-block">
             <label>PILOT CALLSIGN</label>
             <input type="text" id="username" placeholder="CALLSIGN" maxlength="10" value="FALCON-1">
         </div>
-
         <div class="action-grid">
-            <button class="gold-btn" onclick="hostGame()">
-                ⚡ CREATE 4-DIGIT AIRSPACE
-            </button>
+            <button class="gold-btn" onclick="hostGame()">⚡ CREATE 4-DIGIT AIRSPACE</button>
             <div class="or-separator"><span>OR ENTER CODE</span></div>
             <div class="join-row">
                 <input type="text" id="joinCode" maxlength="4" placeholder="••••" autocomplete="off" inputmode="numeric">
                 <button class="emerald-btn" onclick="joinGame()">SCRAMBLE JET</button>
             </div>
         </div>
-
         <p id="statusMsg">STATUS: SENSORS ACTIVE • ALL SQUADRONS STANDBY</p>
     </div>
 
-    <!-- Host 4-Digit Code Pop-up -->
     <div id="hostModal">
         <div class="modal-box">
             <div class="modal-header">DUBAI AIRSPACE ESTABLISHED</div>
             <p style="font-size: 13px; color: #ccc;">SHARE THIS 4-DIGIT CODE WITH YOUR WINGMEN:</p>
             <div id="generatedCodeDisplay">----</div>
-            <button class="copy-btn" onclick="copyCode()">📋 COPY CODE</button>
-            <br>
+            <button class="copy-btn" onclick="copyCode()">📋 COPY CODE</button><br>
             <button class="gold-btn" style="margin-top: 15px; width: 100%;" onclick="closeHostModalAndFly()">🚀 DEPLOY OVER DOWNTOWN DUBAI</button>
         </div>
     </div>
 
-    <!-- Cockpit HUD -->
     <div id="hud">
         <div id="squadBadge">AIRSPACE: <span id="hudCode">SOLO PATROL</span></div>
         <div id="atcChatter">DUBAI ATC: RADAR ONLINE OVER BURJ KHALIFA</div>
-
         <div class="flight-telemetry">
             <div class="bar-title">JET SHIELD & HULL</div>
             <div id="healthBarBox"><div id="healthBar"></div></div>
@@ -417,45 +106,17 @@
             <div id="altGauge">ALT: 1,850 FT</div>
             <div id="landmarkBeacon">OVERFLYING: DOWNTOWN DUBAI</div>
         </div>
-
-        <div class="controls-hint">
-            W/S: Pitch | A/D: Roll | Q/E: Rudder | SHIFT: Afterburner | SPACE: Cannons | M: Dubai Homing Missile
-        </div>
+        <div class="controls-hint">W/S: Pitch | A/D: Roll | Q/E: Rudder | SHIFT: Boost | SPACE: Cannons | M: Missile</div>
     </div>
 
-    <!-- HUD Crosshair -->
     <div id="crosshair">
-        <div class="cross-diamond"></div>
-        <div class="cross-dot"></div>
-        <div class="wing left"></div>
-        <div class="wing right"></div>
+        <div class="cross-diamond"></div><div class="cross-dot"></div>
+        <div class="wing left"></div><div class="wing right"></div>
         <div id="lockState">TRACKING AIRSPACE</div>
     </div>
 
     <div id="killFeed"></div>
     <div id="notification"></div>
-
-    <!-- Touch Mobile Virtual Controls -->
-    <div id="touchControls">
-        <div id="stickLeft">
-            <div class="touch-row"><button class="t-btn" id="btnW">▲</button></div>
-            <div class="touch-row">
-                <button class="t-btn" id="btnA">◀</button>
-                <button class="t-btn" id="btnS">▼</button>
-                <button class="t-btn" id="btnD">▶</button>
-            </div>
-        </div>
-        <div id="stickRight">
-            <button class="t-btn round big" id="btnSpace">🔥</button>
-            <div class="sub-actions">
-                <button class="t-btn round" id="btnShift">⚡</button>
-                <button class="t-btn round" id="btnM">🚀</button>
-                <button class="t-btn round" id="btnL" style="display:none; border-color:#00ffff; color:#00ffff;">⚡</button>
-            </div>
-        </div>
-    </div>
-
-    <!-- Dubai VIP Admin Control (PIN: 8007) -->
     <div id="settingsCog" onclick="toggleAdminPanel()">⚙️</div>
     <div id="adminPanel">
         <div style="display:flex; justify-content:space-between; align-items:center;">
@@ -477,6 +138,363 @@
 
     <canvas id="gameCanvas"></canvas>
 
-    <script src="script.js"></script>
+    <script>
+        const SoundFX = {
+            ctx: null,
+            init() { if (!this.ctx) this.ctx = new (window.AudioContext || window.webkitAudioContext)(); },
+            cannon() {
+                if (!this.ctx) return;
+                const o = this.ctx.createOscillator(), g = this.ctx.createGain();
+                o.type = 'sawtooth'; o.frequency.setValueAtTime(520, this.ctx.currentTime);
+                o.frequency.exponentialRampToValueAtTime(80, this.ctx.currentTime + 0.08);
+                g.gain.setValueAtTime(0.2, this.ctx.currentTime); g.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + 0.08);
+                o.connect(g); g.connect(this.ctx.destination); o.start(); o.stop(this.ctx.currentTime + 0.08);
+            },
+            missile() {
+                if (!this.ctx) return;
+                const o = this.ctx.createOscillator(), g = this.ctx.createGain();
+                o.type = 'triangle'; o.frequency.setValueAtTime(140, this.ctx.currentTime);
+                o.frequency.linearRampToValueAtTime(750, this.ctx.currentTime + 0.35);
+                g.gain.setValueAtTime(0.3, this.ctx.currentTime); g.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + 0.35);
+                o.connect(g); g.connect(this.ctx.destination); o.start(); o.stop(this.ctx.currentTime + 0.35);
+            },
+            explosion() {
+                if (!this.ctx) return;
+                const o = this.ctx.createOscillator(), g = this.ctx.createGain();
+                o.type = 'square'; o.frequency.setValueAtTime(90, this.ctx.currentTime);
+                o.frequency.exponentialRampToValueAtTime(15, this.ctx.currentTime + 0.6);
+                g.gain.setValueAtTime(0.4, this.ctx.currentTime); g.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + 0.6);
+                o.connect(g); g.connect(this.ctx.destination); o.start(); o.stop(this.ctx.currentTime + 0.6);
+            }
+        };
+
+        const canvas = document.getElementById('gameCanvas');
+        const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: "high-performance" });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+
+        const scene = new THREE.Scene();
+        scene.background = new THREE.Color(0x030b18);
+        scene.fog = new THREE.FogExp2(0x06152a, 0.00035);
+
+        const camera = new THREE.PerspectiveCamera(65, window.innerWidth / window.innerHeight, 0.5, 14000);
+        scene.add(new THREE.AmbientLight(0x4a6080, 1.4));
+        const sunLight = new THREE.DirectionalLight(0xffbe55, 2.5); sunLight.position.set(2500, 1400, -2000); scene.add(sunLight);
+        const gulfFill = new THREE.DirectionalLight(0x00e1ff, 0.8); gulfFill.position.set(-2000, 800, 2000); scene.add(gulfFill);
+
+        // Arabian Gulf & Desert
+        const ocean = new THREE.Mesh(new THREE.PlaneGeometry(16000, 8000), new THREE.MeshStandardMaterial({ color: 0x012f47, roughness: 0.1, metalness: 0.9 }));
+        ocean.rotation.x = -Math.PI / 2; ocean.position.set(0, -2, -4000); scene.add(ocean);
+        const desert = new THREE.Mesh(new THREE.PlaneGeometry(16000, 10000), new THREE.MeshStandardMaterial({ color: 0xbfa36f, roughness: 0.95 }));
+        desert.rotation.x = -Math.PI / 2; desert.position.set(0, -1, 3500); scene.add(desert);
+
+        // 1. BURJ KHALIFA (with dynamic cascading LED light show)
+        const burjKhalifaGroup = new THREE.Group();
+        burjKhalifaGroup.position.set(400, 0, 600);
+        const bkGlassMat = new THREE.MeshStandardMaterial({ color: 0x90caf9, metalness: 0.95, roughness: 0.1 });
+        const tiers = [ { rB: 110, rT: 95, h: 160 }, { rB: 95, rT: 80, h: 160 }, { rB: 80, rT: 65, h: 150 }, { rB: 65, rT: 50, h: 140 }, { rB: 50, rT: 35, h: 130 }, { rB: 35, rT: 20, h: 120 }, { rB: 20, rT: 8, h: 110 }, { rB: 8, rT: 3, h: 100 } ];
+        let curY = 0;
+        tiers.forEach(t => {
+            for (let w = 0; w < 3; w++) {
+                const ang = (w * Math.PI * 2) / 3;
+                const wing = new THREE.Mesh(new THREE.CylinderGeometry(t.rT * 0.45, t.rB * 0.45, t.h, 6), bkGlassMat);
+                wing.position.set(Math.cos(ang) * (t.rB * 0.4), curY + (t.h / 2), Math.sin(ang) * (t.rB * 0.4));
+                burjKhalifaGroup.add(wing);
+            }
+            const core = new THREE.Mesh(new THREE.CylinderGeometry(t.rT, t.rB, t.h, 12), bkGlassMat);
+            core.position.y = curY + (t.h / 2); burjKhalifaGroup.add(core); curY += t.h;
+        });
+        const spire = new THREE.Mesh(new THREE.CylinderGeometry(1.5, 4, 180, 8), new THREE.MeshStandardMaterial({ color: 0xd8d8d8, metalness: 0.95 }));
+        spire.position.y = curY + 90; burjKhalifaGroup.add(spire);
+        const ledStrip = new THREE.Mesh(new THREE.BoxGeometry(3, curY, 3), new THREE.MeshBasicMaterial({ color: 0x00ff88 }));
+        ledStrip.position.set(0, curY / 2, 85); burjKhalifaGroup.add(ledStrip);
+        const crownBeacon = new THREE.Mesh(new THREE.SphereGeometry(4, 8, 8), new THREE.MeshBasicMaterial({ color: 0xff0033 }));
+        crownBeacon.position.y = curY + 180; burjKhalifaGroup.add(crownBeacon);
+        scene.add(burjKhalifaGroup);
+
+        // 2. SHEIKH ZAYED ROAD & METRO
+        const szrGroup = new THREE.Group();
+        const szrRoad = new THREE.Mesh(new THREE.BoxGeometry(220, 3, 9000), new THREE.MeshStandardMaterial({ color: 0x14171d, roughness: 0.7 }));
+        szrRoad.position.set(0, 1, 600); szrGroup.add(szrRoad);
+        for (let i = 0; i < 45; i++) {
+            const redTrail = new THREE.Mesh(new THREE.BoxGeometry(4, 2, 100 + Math.random() * 120), new THREE.MeshBasicMaterial({ color: 0xff1e40 }));
+            redTrail.position.set(-40 - Math.random() * 60, 4, (Math.random() * 8000) - 3400); szrGroup.add(redTrail);
+            const goldTrail = new THREE.Mesh(new THREE.BoxGeometry(4, 2, 100 + Math.random() * 120), new THREE.MeshBasicMaterial({ color: 0xffd700 }));
+            goldTrail.position.set(40 + Math.random() * 60, 4, (Math.random() * 8000) - 3400); szrGroup.add(goldTrail);
+        }
+        for (let z = -3400; z < 4500; z += 220) {
+            const pillar = new THREE.Mesh(new THREE.BoxGeometry(8, 30, 8), new THREE.MeshStandardMaterial({ color: 0xa0aab2 }));
+            pillar.position.set(135, 15, z); szrGroup.add(pillar);
+        }
+        const metroTrack = new THREE.Mesh(new THREE.BoxGeometry(16, 4, 8000), new THREE.MeshStandardMaterial({ color: 0xa0aab2 }));
+        metroTrack.position.set(135, 30, 600); szrGroup.add(metroTrack);
+        const metroStation = new THREE.Mesh(new THREE.SphereGeometry(35, 24, 16), new THREE.MeshStandardMaterial({ color: 0xffcc33, metalness: 0.85 }));
+        metroStation.scale.set(0.6, 0.45, 2.2); metroStation.position.set(135, 36, 400); szrGroup.add(metroStation);
+        scene.add(szrGroup);
+
+        // Flanking Skyscrapers
+        const dubaiTowerMats = [ new THREE.MeshStandardMaterial({ color: 0x0e2a47, metalness: 0.9 }), new THREE.MeshStandardMaterial({ color: 0xd4af37, metalness: 0.85 }), new THREE.MeshStandardMaterial({ color: 0x1f3c58, metalness: 0.9 }) ];
+        for (let z = -2500; z < 4200; z += 240) {
+            if (Math.abs(z - 600) > 450) {
+                [-240 - Math.random() * 120, 240 + Math.random() * 120].forEach(x => {
+                    const h = 200 + Math.random() * 320, w = 70 + Math.random() * 40;
+                    const b = new THREE.Mesh(new THREE.BoxGeometry(w, h, w), dubaiTowerMats[Math.floor(Math.random() * dubaiTowerMats.length)]);
+                    b.position.set(x, h / 2, z); scene.add(b);
+                    const crown = new THREE.Mesh(new THREE.BoxGeometry(w * 0.95, 3, w * 0.95), new THREE.MeshBasicMaterial({ color: (Math.random() > 0.5 ? 0x00ff88 : 0xffd700) }));
+                    crown.position.set(x, h + 2, z); scene.add(crown);
+                });
+            }
+        }
+
+        // 3. MUSEUM OF THE FUTURE
+        const motfRing = new THREE.Mesh(new THREE.TorusGeometry(55, 20, 24, 48), new THREE.MeshStandardMaterial({ color: 0xdadada, metalness: 0.95 }));
+        motfRing.scale.set(1.4, 0.9, 0.7); motfRing.position.set(-280, 55, 950); motfRing.rotation.y = Math.PI * 0.4; scene.add(motfRing);
+
+        // 4. DUBAI FRAME
+        const frameGroup = new THREE.Group(); frameGroup.position.set(950, 0, 2000); frameGroup.rotation.y = Math.PI * 0.3;
+        const gMat = new THREE.MeshStandardMaterial({ color: 0xffb700, metalness: 0.9 });
+        const cL = new THREE.Mesh(new THREE.BoxGeometry(22, 280, 22), gMat); cL.position.set(-90, 140, 0); frameGroup.add(cL);
+        const cR = new THREE.Mesh(new THREE.BoxGeometry(22, 280, 22), gMat); cR.position.set(90, 140, 0); frameGroup.add(cR);
+        const sB = new THREE.Mesh(new THREE.BoxGeometry(202, 24, 28), gMat); sB.position.set(0, 275, 0); frameGroup.add(sB);
+        const fB = new THREE.Mesh(new THREE.BoxGeometry(202, 20, 28), gMat); fB.position.set(0, 10, 0); frameGroup.add(fB);
+        scene.add(frameGroup);
+
+        // 5. BURJ AL ARAB
+        const burjAlArabGroup = new THREE.Group(); burjAlArabGroup.position.set(-1800, 0, -1400);
+        const isl = new THREE.Mesh(new THREE.CylinderGeometry(180, 190, 16, 32), new THREE.MeshStandardMaterial({ color: 0xd6c29b })); isl.position.y = 6; burjAlArabGroup.add(isl);
+        const sail = new THREE.Mesh(new THREE.TorusGeometry(170, 22, 16, 36, Math.PI * 0.65), new THREE.MeshStandardMaterial({ color: 0xffffff }));
+        sail.rotation.z = -Math.PI / 2.3; sail.rotation.y = Math.PI / 2; sail.position.set(0, 180, 0); burjAlArabGroup.add(sail);
+        const mast = new THREE.Mesh(new THREE.CylinderGeometry(8, 12, 350, 12), new THREE.MeshStandardMaterial({ color: 0x1a2e40 })); mast.position.set(-35, 180, 0); burjAlArabGroup.add(mast);
+        const helipad = new THREE.Mesh(new THREE.CylinderGeometry(32, 32, 4, 16), new THREE.MeshStandardMaterial({ color: 0x00ff88 })); helipad.position.set(28, 280, 0); burjAlArabGroup.add(helipad);
+        scene.add(burjAlArabGroup);
+
+        // JET FIGHTER
+        function createFighterJet(isEnemy) {
+            const jet = new THREE.Group();
+            const bMat = new THREE.MeshStandardMaterial({ color: (isEnemy ? 0x8b0000 : 0xffffff), metalness: 0.85 });
+            const tMat = new THREE.MeshStandardMaterial({ color: (isEnemy ? 0xff3b30 : 0x00ff88), metalness: 0.5 });
+            const gMat = new THREE.MeshStandardMaterial({ color: 0xffd700, metalness: 0.95 });
+            const fuse = new THREE.Mesh(new THREE.ConeGeometry(2.5, 20, 8), bMat); fuse.rotation.x = Math.PI / 2; jet.add(fuse);
+            const nose = new THREE.Mesh(new THREE.ConeGeometry(1.2, 5, 8), gMat); nose.rotation.x = Math.PI / 2; nose.position.z = -8; jet.add(nose);
+            const cock = new THREE.Mesh(new THREE.SphereGeometry(1.4, 16, 16), new THREE.MeshStandardMaterial({ color: 0x00e1ff, transparent: true, opacity: 0.8 }));
+            cock.scale.set(0.65, 0.8, 2.5); cock.position.set(0, 1.2, -1.8); jet.add(cock);
+            const wShape = new THREE.Shape(); wShape.moveTo(0, 4); wShape.lineTo(13, -4); wShape.lineTo(13, -7); wShape.lineTo(0, -3.5); wShape.closePath();
+            const wR = new THREE.Mesh(new THREE.ExtrudeGeometry(wShape, { depth: 0.35, bevelEnabled: false }), tMat); wR.rotation.x = Math.PI / 2; jet.add(wR);
+            const wL = wR.clone(); wL.scale.x = -1; jet.add(wL);
+            const fL = new THREE.Mesh(new THREE.BoxGeometry(0.3, 3.6, 4.5), gMat); fL.position.set(-2, 2, 6); fL.rotation.z = -0.22; jet.add(fL);
+            const fR = new THREE.Mesh(new THREE.BoxGeometry(0.3, 3.6, 4.5), gMat); fR.position.set(2, 2, 6); fR.rotation.z = 0.22; jet.add(fR);
+            const flL = new THREE.Mesh(new THREE.ConeGeometry(0.7, 4.5, 12), new THREE.MeshBasicMaterial({ color: (isEnemy ? 0xff2200 : 0x00ffcc) })); flL.rotation.x = -Math.PI / 2; flL.position.set(-1.2, 0, 10.5); jet.add(flL);
+            const flR = flL.clone(); flR.position.x = 1.2; jet.add(flR);
+            jet.userData = { flL, flR };
+            return jet;
+        }
+
+        const localJet = createFighterJet(false); localJet.position.set(0, 320, 1400); scene.add(localJet);
+        const flight = { speed: 3.8, boostSpeed: 10.5, pitchRate: 0.038, rollRate: 0.055, yawRate: 0.022, health: 100, alive: true, name: "FALCON-1" };
+        const keys = { w: false, s: false, a: false, d: false, q: false, e: false, shift: false, space: false, m: false, l: false };
+        const cheats = { laser: false, god: false, speed: false, rapid: false };
+        const bullets = [], missiles = [], particles = [], remotePlayers = {};
+        let lastShot = 0, lastMissile = 0;
+
+        function fireCannons() {
+            SoundFX.cannon();
+            const fwd = new THREE.Vector3(0, 0, -1).applyQuaternion(localJet.quaternion);
+            [-2.2, 2.2].forEach(offset => {
+                const b = new THREE.Mesh(new THREE.CylinderGeometry(0.35, 0.35, 6, 6), new THREE.MeshBasicMaterial({ color: cheats.rapid ? 0xff0055 : 0x00ff88 }));
+                b.quaternion.copy(localJet.quaternion); b.rotateX(Math.PI / 2);
+                b.position.copy(localJet.position).add(new THREE.Vector3(offset, 0, -1).applyQuaternion(localJet.quaternion));
+                bullets.push({ mesh: b, vel: fwd.clone().multiplyScalar(flight.speed + 17), life: 100, owner: peer ? peer.id : 'local' });
+                scene.add(b);
+            });
+            broadcast({ type: 'shoot', pos: localJet.position, quat: localJet.quaternion });
+        }
+
+        function fireMissile() {
+            SoundFX.missile();
+            const fwd = new THREE.Vector3(0, 0, -1).applyQuaternion(localJet.quaternion);
+            const m = new THREE.Mesh(new THREE.CylinderGeometry(0.6, 0.7, 7, 8), new THREE.MeshStandardMaterial({ color: 0xffd700 }));
+            m.quaternion.copy(localJet.quaternion); m.rotateX(Math.PI / 2);
+            m.position.copy(localJet.position).add(fwd.clone().multiplyScalar(5));
+            let nearest = null, minDist = 4000;
+            Object.values(remotePlayers).forEach(p => { const d = p.mesh.position.distanceTo(localJet.position); if (d < minDist) { minDist = d; nearest = p.mesh; } });
+            missiles.push({ mesh: m, target: nearest, vel: fwd.clone().multiplyScalar(flight.speed + 9), life: 250, owner: peer ? peer.id : 'local' });
+            scene.add(m);
+            showNotification("🚀 FALCON MISSILE TRACKING");
+        }
+
+        function createExplosion(pos, color, count = 25) {
+            SoundFX.explosion();
+            for (let i = 0; i < count; i++) {
+                const p = new THREE.Mesh(new THREE.SphereGeometry(1.2 + Math.random() * 2, 6, 6), new THREE.MeshBasicMaterial({ color }));
+                p.position.copy(pos);
+                particles.push({ mesh: p, vel: new THREE.Vector3((Math.random() - 0.5) * 7, (Math.random() - 0.5) * 7, (Math.random() - 0.5) * 7), life: 40 });
+                scene.add(p);
+            }
+        }
+
+        // PEERJS 4-DIGIT MULTIPLAYER
+        let peer = null, connections = [], currentRoomCode = null;
+        function generate4DigitCode() { return Math.floor(1000 + Math.random() * 9000).toString(); }
+
+        function hostGame() {
+            SoundFX.init();
+            flight.name = document.getElementById('username').value.trim() || 'FALCON-LEAD';
+            currentRoomCode = generate4DigitCode();
+            peer = new Peer('dubai-sky-' + currentRoomCode);
+            peer.on('open', () => {
+                document.getElementById('menu').style.display = 'none';
+                document.getElementById('generatedCodeDisplay').innerText = currentRoomCode;
+                document.getElementById('hostModal').style.display = 'flex';
+                document.getElementById('hudCode').innerText = `SQUAD [ ${currentRoomCode} ] (HOST)`;
+            });
+            peer.on('connection', conn => setupConn(conn));
+            peer.on('error', err => { if (err.type === 'unavailable-id') hostGame(); });
+        }
+
+        function copyCode() { if (currentRoomCode) { navigator.clipboard.writeText(currentRoomCode); showNotification("COPIED: " + currentRoomCode); } }
+        function closeHostModalAndFly() { document.getElementById('hostModal').style.display = 'none'; showNotification("DEPLOYED OVER DUBAI"); }
+
+        function joinGame() {
+            SoundFX.init();
+            flight.name = document.getElementById('username').value.trim() || 'FALCON-WING';
+            const code = document.getElementById('joinCode').value.trim();
+            if (code.length !== 4) return alert("Enter 4-digit code");
+            currentRoomCode = code;
+            peer = new Peer();
+            peer.on('open', () => {
+                const conn = peer.connect('dubai-sky-' + currentRoomCode);
+                setupConn(conn);
+                document.getElementById('menu').style.display = 'none';
+                document.getElementById('hudCode').innerText = `SQUAD [ ${currentRoomCode} ]`;
+                showNotification("JOINED SQUAD " + currentRoomCode);
+            });
+        }
+
+        function setupConn(conn) {
+            connections.push(conn);
+            conn.on('open', () => conn.send({ type: 'join', name: flight.name, pos: localJet.position }));
+            conn.on('data', data => handleNet(conn, data));
+            conn.on('close', () => { if (remotePlayers[conn.peer]) { scene.remove(remotePlayers[conn.peer].mesh); delete remotePlayers[conn.peer]; } });
+        }
+
+        function broadcast(msg) { connections.forEach(c => { if (c.open) c.send(msg); }); }
+
+        function handleNet(conn, data) {
+            if (data.type === 'join' || data.type === 'sync_ack') {
+                if (!remotePlayers[conn.peer]) {
+                    const m = createFighterJet(true); scene.add(m);
+                    remotePlayers[conn.peer] = { mesh: m, targetPos: m.position.clone(), targetQuat: m.quaternion.clone() };
+                    if (data.type === 'join') conn.send({ type: 'sync_ack', name: flight.name, pos: localJet.position });
+                }
+            } else if (data.type === 'state' && remotePlayers[conn.peer]) {
+                remotePlayers[conn.peer].targetPos.copy(data.pos);
+                remotePlayers[conn.peer].targetQuat.copy(data.quat);
+            } else if (data.type === 'shoot') {
+                const b = new THREE.Mesh(new THREE.CylinderGeometry(0.35, 0.35, 6, 6), new THREE.MeshBasicMaterial({ color: 0xff3b30 }));
+                b.quaternion.copy(data.quat); b.rotateX(Math.PI / 2); b.position.copy(data.pos);
+                bullets.push({ mesh: b, vel: new THREE.Vector3(0,0,-1).applyQuaternion(b.quaternion).multiplyScalar(flight.speed + 17), life: 100, owner: conn.peer });
+                scene.add(b);
+            } else if (data.type === 'hit' && data.targetId === (peer ? peer.id : '')) {
+                applyDamage(data.dmg, "BOGEY");
+            }
+        }
+
+        function applyDamage(amt, src) {
+            if (cheats.god || !flight.alive) return;
+            flight.health -= amt;
+            document.getElementById('healthBar').style.width = Math.max(0, flight.health) + '%';
+            if (flight.health <= 0) {
+                flight.alive = false; localJet.visible = false;
+                createExplosion(localJet.position, 0xff3300, 60);
+                setTimeout(() => { flight.health = 100; flight.alive = true; localJet.visible = true; localJet.position.set(0, 320, 1400); document.getElementById('healthBar').style.width = '100%'; }, 3000);
+            }
+        }
+
+        function showNotification(txt) {
+            const n = document.getElementById('notification'); n.innerText = txt; n.style.opacity = '1';
+            setTimeout(() => { n.style.opacity = '0'; }, 2000);
+        }
+
+        window.addEventListener('keydown', e => { const k = e.key.toLowerCase(); if (keys.hasOwnProperty(k)) keys[k] = true; if (e.key === 'Shift') keys.shift = true; if (e.code === 'Space') keys.space = true; });
+        window.addEventListener('keyup', e => { const k = e.key.toLowerCase(); if (keys.hasOwnProperty(k)) keys[k] = false; if (e.key === 'Shift') keys.shift = false; if (e.code === 'Space') keys.space = false; });
+        window.addEventListener('resize', () => { camera.aspect = window.innerWidth / window.innerHeight; camera.updateProjectionMatrix(); renderer.setSize(window.innerWidth, window.innerHeight); });
+
+        function toggleAdminPanel() { const p = document.getElementById('adminPanel'); p.style.display = p.style.display === 'block' ? 'none' : 'block'; }
+        function unlockAdmin() { if (document.getElementById('adminPass').value === '8007') { document.getElementById('loginSection').style.display = 'none'; document.getElementById('cheatSection').style.display = 'block'; } else alert("DENIED"); }
+        function toggleCheat(c) { cheats[c] = !cheats[c]; document.getElementById('btn' + c.charAt(0).toUpperCase() + c.slice(1)).classList.toggle('active', cheats[c]); }
+
+        function animate() {
+            requestAnimationFrame(animate);
+            ledStrip.material.color.setHSL((Date.now() * 0.0003) % 1, 1, 0.5);
+
+            if (flight.alive) {
+                let curSpeed = (keys.shift ? flight.boostSpeed : flight.speed) * (cheats.speed ? 2 : 1);
+                localJet.userData.flL.scale.set(1, keys.shift ? 2.2 : 1, 1); localJet.userData.flR.scale.set(1, keys.shift ? 2.2 : 1, 1);
+                if (keys.w) localJet.rotateX(flight.pitchRate); if (keys.s) localJet.rotateX(-flight.pitchRate);
+                if (keys.a) localJet.rotateZ(flight.rollRate); if (keys.d) localJet.rotateZ(-flight.rollRate);
+                if (keys.q) localJet.rotateY(flight.yawRate); if (keys.e) localJet.rotateY(-flight.yawRate);
+
+                const fwd = new THREE.Vector3(0, 0, -1).applyQuaternion(localJet.quaternion);
+                localJet.position.add(fwd.multiplyScalar(curSpeed));
+                if (localJet.position.y < 12) { localJet.position.y = 12; applyDamage(100, "TERRAIN"); }
+
+                camera.position.lerp(localJet.position.clone().add(new THREE.Vector3(0, 7.5, 25).applyQuaternion(localJet.quaternion)), 0.12);
+                camera.lookAt(localJet.position.clone().add(fwd.clone().multiplyScalar(45)));
+
+                const now = performance.now();
+                if (keys.space && now - lastShot > (cheats.rapid ? 60 : 150)) { fireCannons(); lastShot = now; }
+                if (keys.m && now - lastMissile > 1100) { fireMissile(); lastMissile = now; }
+
+                broadcast({ type: 'state', pos: localJet.position, quat: localJet.quaternion });
+
+                const jz = localJet.position.z, jx = localJet.position.x;
+                let sector = "SECTOR: ARABIAN GULF PATROL";
+                if (jz > 0 && jz < 1200 && Math.abs(jx) < 600) sector = "OVERFLYING: BURJ KHALIFA";
+                else if (Math.abs(jx) < 200) sector = "OVERFLYING: SHEIKH ZAYED ROAD";
+                else if (jx < -1200) sector = "OVERFLYING: BURJ AL ARAB";
+                document.getElementById('landmarkBeacon').innerText = sector;
+                document.getElementById('speedGauge').innerText = `THRUST: ${keys.shift ? '150%' : '100%'} | MACH ${(curSpeed * 0.28).toFixed(1)}`;
+                document.getElementById('altGauge').innerText = `ALT: ${Math.round(localJet.position.y * 3.28)} FT`;
+            }
+
+            Object.values(remotePlayers).forEach(p => { p.mesh.position.lerp(p.targetPos, 0.2); p.mesh.quaternion.slerp(p.targetQuat, 0.2); });
+
+            for (let i = bullets.length - 1; i >= 0; i--) {
+                const b = bullets[i]; b.mesh.position.add(b.vel); b.life--;
+                if (b.owner === (peer ? peer.id : 'local')) {
+                    Object.entries(remotePlayers).forEach(([id, p]) => {
+                        if (b.mesh.position.distanceTo(p.mesh.position) < 8.5) {
+                            b.life = 0; createExplosion(b.mesh.position, 0x00ff88, 10); broadcast({ type: 'hit', targetId: id, dmg: 16 });
+                        }
+                    });
+                }
+                if (b.life <= 0) { scene.remove(b.mesh); bullets.splice(i, 1); }
+            }
+
+            for (let i = missiles.length - 1; i >= 0; i--) {
+                const m = missiles[i];
+                if (m.target) {
+                    const des = m.target.position.clone().sub(m.mesh.position).normalize();
+                    m.vel.lerp(des.multiplyScalar(flight.speed + 12), 0.08);
+                    m.mesh.quaternion.setFromUnitVectors(new THREE.Vector3(0,1,0), m.vel.clone().normalize()); m.mesh.rotateX(Math.PI / 2);
+                }
+                m.mesh.position.add(m.vel); m.life--;
+                if (m.target && m.mesh.position.distanceTo(m.target.position) < 12) {
+                    createExplosion(m.mesh.position, 0xff3300, 30);
+                    Object.entries(remotePlayers).forEach(([id, p]) => { if (p.mesh === m.target) broadcast({ type: 'hit', targetId: id, dmg: 65 }); });
+                    m.life = 0;
+                }
+                if (m.life <= 0) { scene.remove(m.mesh); missiles.splice(i, 1); }
+            }
+
+            for (let i = particles.length - 1; i >= 0; i--) {
+                const pt = particles[i]; pt.mesh.position.add(pt.vel); pt.life--;
+                if (pt.life <= 0) { scene.remove(pt.mesh); particles.splice(i, 1); }
+            }
+
+            renderer.render(scene, camera);
+        }
+        animate();
+    </script>
 </body>
 </html>

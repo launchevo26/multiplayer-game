@@ -1,569 +1,806 @@
-/** CONFIGURATION */
-const APP_PREFIX = "sky-battle-v5-"; 
-const ADMIN_PASSWORD = "8007"; 
-const WORLD_SIZE = 3000; 
-const MAX_SPEED = 12;
-const MIN_SPEED = 3;
+/* ===================================================================
+ * SKY BATTLE DUBAI 3D - FULL DUBAI CITY AIR DEFENSE + 4-DIGIT P2P
+ * =================================================================== */
 
-// -- GLOBALS --
-let peer = null, conn = null, connections = [];
-let isHost = false, myId = null, isAdmin = false;
-let myName = "Pilot";
-let feedMessages = [];
-let isTouchDevice = false;
+const SoundFX = {
+    ctx: null,
+    init() {
+        if (!this.ctx) this.ctx = new (window.AudioContext || window.webkitAudioContext)();
+    },
+    cannon() {
+        if (!this.ctx) return;
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+        osc.type = 'sawtooth';
+        osc.frequency.setValueAtTime(520, this.ctx.currentTime);
+        osc.frequency.exponentialRampToValueAtTime(80, this.ctx.currentTime + 0.08);
+        gain.gain.setValueAtTime(0.2, this.ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + 0.08);
+        osc.connect(gain); gain.connect(this.ctx.destination);
+        osc.start(); osc.stop(this.ctx.currentTime + 0.08);
+    },
+    missile() {
+        if (!this.ctx) return;
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+        osc.type = 'triangle';
+        osc.frequency.setValueAtTime(140, this.ctx.currentTime);
+        osc.frequency.linearRampToValueAtTime(750, this.ctx.currentTime + 0.35);
+        gain.gain.setValueAtTime(0.3, this.ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + 0.35);
+        osc.connect(gain); gain.connect(this.ctx.destination);
+        osc.start(); osc.stop(this.ctx.currentTime + 0.35);
+    },
+    explosion() {
+        if (!this.ctx) return;
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+        osc.type = 'square';
+        osc.frequency.setValueAtTime(90, this.ctx.currentTime);
+        osc.frequency.exponentialRampToValueAtTime(15, this.ctx.currentTime + 0.6);
+        gain.gain.setValueAtTime(0.4, this.ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + 0.6);
+        osc.connect(gain); gain.connect(this.ctx.destination);
+        osc.start(); osc.stop(this.ctx.currentTime + 0.6);
+    }
+};
 
-// Game State
+// --- Three.js Setup ---
 const canvas = document.getElementById('gameCanvas');
-const ctx = canvas.getContext('2d');
+const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: "high-performance" });
+renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
 
-let players = {};
-let projectiles = [];
-let lasers = []; // Now stores active beam data for the current frame only
-let particles = [];
-let stars = [];
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x030b18);
+scene.fog = new THREE.FogExp2(0x06152a, 0.00035);
 
-// Inputs (Case insensitive mapping)
-const keys = { w:false, a:false, s:false, d:false, Space:false, m:false, l:false, Shift:false };
+const camera = new THREE.PerspectiveCamera(65, window.innerWidth / window.innerHeight, 0.5, 14000);
 
-// Init Background
-for(let i=0; i<200; i++) {
-    stars.push({
-        x: Math.random() * WORLD_SIZE,
-        y: Math.random() * WORLD_SIZE,
-        size: Math.random() * 2 + 1
+// Lighting
+scene.add(new THREE.AmbientLight(0x4a6080, 1.4));
+const sunLight = new THREE.DirectionalLight(0xffbe55, 2.5);
+sunLight.position.set(2500, 1400, -2000);
+scene.add(sunLight);
+const gulfFill = new THREE.DirectionalLight(0x00e1ff, 0.8);
+gulfFill.position.set(-2000, 800, 2000);
+scene.add(gulfFill);
+
+// --- 3D DUBAI ENVIRONMENT ---
+
+// 1. Arabian Gulf
+const ocean = new THREE.Mesh(
+    new THREE.PlaneGeometry(16000, 8000),
+    new THREE.MeshStandardMaterial({ color: 0x012f47, roughness: 0.1, metalness: 0.9 })
+);
+ocean.rotation.x = -Math.PI / 2;
+ocean.position.set(0, -2, -4000);
+scene.add(ocean);
+
+// 2. Golden Sand Desert
+const desert = new THREE.Mesh(
+    new THREE.PlaneGeometry(16000, 10000),
+    new THREE.MeshStandardMaterial({ color: 0xbfa36f, roughness: 0.95, metalness: 0.05 })
+);
+desert.rotation.x = -Math.PI / 2;
+desert.position.set(0, -1, 3500);
+scene.add(desert);
+
+// 3. BURJ KHALIFA (Downtown Centerpiece with Dynamic LED Facade)
+const burjKhalifaGroup = new THREE.Group();
+burjKhalifaGroup.position.set(400, 0, 600);
+const bkGlassMat = new THREE.MeshStandardMaterial({ color: 0x90caf9, metalness: 0.95, roughness: 0.1 });
+const tiers = [
+    { rB: 110, rT: 95, h: 160 }, { rB: 95, rT: 80, h: 160 },
+    { rB: 80, rT: 65, h: 150 },  { rB: 65, rT: 50, h: 140 },
+    { rB: 50, rT: 35, h: 130 },  { rB: 35, rT: 20, h: 120 },
+    { rB: 20, rT: 8, h: 110 },   { rB: 8, rT: 3, h: 100 }
+];
+
+let curY = 0;
+tiers.forEach(t => {
+    for (let w = 0; w < 3; w++) {
+        const ang = (w * Math.PI * 2) / 3;
+        const wing = new THREE.Mesh(new THREE.CylinderGeometry(t.rT * 0.45, t.rB * 0.45, t.h, 6), bkGlassMat);
+        const dist = t.rB * 0.4;
+        wing.position.set(Math.cos(ang) * dist, curY + (t.h / 2), Math.sin(ang) * dist);
+        burjKhalifaGroup.add(wing);
+    }
+    const core = new THREE.Mesh(new THREE.CylinderGeometry(t.rT, t.rB, t.h, 12), bkGlassMat);
+    core.position.y = curY + (t.h / 2);
+    burjKhalifaGroup.add(core);
+    curY += t.h;
+});
+
+const spire = new THREE.Mesh(new THREE.CylinderGeometry(1.5, 4, 180, 8), new THREE.MeshStandardMaterial({ color: 0xd8d8d8, metalness: 0.95, roughness: 0.1 }));
+spire.position.y = curY + 90;
+burjKhalifaGroup.add(spire);
+
+// Cascading LED Light Strip on Burj Khalifa Facade
+const ledStrip = new THREE.Mesh(new THREE.BoxGeometry(3, curY, 3), new THREE.MeshBasicMaterial({ color: 0x00ff88 }));
+ledStrip.position.set(0, curY / 2, 85);
+burjKhalifaGroup.add(ledStrip);
+
+const crownBeacon = new THREE.Mesh(new THREE.SphereGeometry(4, 8, 8), new THREE.MeshBasicMaterial({ color: 0xff0033 }));
+crownBeacon.position.y = curY + 180;
+burjKhalifaGroup.add(crownBeacon);
+scene.add(burjKhalifaGroup);
+
+// 4. SHEIKH ZAYED ROAD & DUBAI METRO VIADUCT
+const szrGroup = new THREE.Group();
+const szrRoad = new THREE.Mesh(new THREE.BoxGeometry(220, 3, 9000), new THREE.MeshStandardMaterial({ color: 0x14171d, roughness: 0.7 }));
+szrRoad.position.set(0, 1, 600);
+szrGroup.add(szrRoad);
+
+const redLightMat = new THREE.MeshBasicMaterial({ color: 0xff1e40 });
+const goldLightMat = new THREE.MeshBasicMaterial({ color: 0xffd700 });
+for (let i = 0; i < 50; i++) {
+    const redTrail = new THREE.Mesh(new THREE.BoxGeometry(4, 2, 100 + Math.random() * 120), redLightMat);
+    redTrail.position.set(-40 - Math.random() * 60, 4, (Math.random() * 8000) - 3400);
+    szrGroup.add(redTrail);
+
+    const goldTrail = new THREE.Mesh(new THREE.BoxGeometry(4, 2, 100 + Math.random() * 120), goldLightMat);
+    goldTrail.position.set(40 + Math.random() * 60, 4, (Math.random() * 8000) - 3400);
+    szrGroup.add(goldTrail);
+}
+
+const metroPillarMat = new THREE.MeshStandardMaterial({ color: 0xa0aab2, roughness: 0.6 });
+for (let z = -3400; z < 4500; z += 220) {
+    const pillar = new THREE.Mesh(new THREE.BoxGeometry(8, 30, 8), metroPillarMat);
+    pillar.position.set(135, 15, z);
+    szrGroup.add(pillar);
+}
+const metroTrack = new THREE.Mesh(new THREE.BoxGeometry(16, 4, 8000), metroPillarMat);
+metroTrack.position.set(135, 30, 600);
+szrGroup.add(metroTrack);
+
+// Gold Clam-Shell Dubai Metro Station
+const metroStation = new THREE.Mesh(new THREE.SphereGeometry(35, 24, 16), new THREE.MeshStandardMaterial({ color: 0xffcc33, metalness: 0.85, roughness: 0.25 }));
+metroStation.scale.set(0.6, 0.45, 2.2);
+metroStation.position.set(135, 36, 400);
+szrGroup.add(metroStation);
+scene.add(szrGroup);
+
+// Flanking SZR Skyscrapers
+const dubaiTowerMats = [
+    new THREE.MeshStandardMaterial({ color: 0x0e2a47, metalness: 0.9, roughness: 0.1 }),
+    new THREE.MeshStandardMaterial({ color: 0xd4af37, metalness: 0.85, roughness: 0.2 }),
+    new THREE.MeshStandardMaterial({ color: 0x1f3c58, metalness: 0.9, roughness: 0.15 })
+];
+for (let z = -2500; z < 4200; z += 240) {
+    if (Math.abs(z - 600) > 450) {
+        [-240 - Math.random() * 120, 240 + Math.random() * 120].forEach(x => {
+            const h = 200 + Math.random() * 320;
+            const w = 70 + Math.random() * 40;
+            const mat = dubaiTowerMats[Math.floor(Math.random() * dubaiTowerMats.length)];
+            const b = new THREE.Mesh(new THREE.BoxGeometry(w, h, w), mat);
+            b.position.set(x, h / 2, z);
+            scene.add(b);
+
+            const crown = new THREE.Mesh(new THREE.BoxGeometry(w * 0.95, 3, w * 0.95), new THREE.MeshBasicMaterial({ color: (Math.random() > 0.5 ? 0x00ff88 : 0xffd700) }));
+            crown.position.set(x, h + 2, z);
+            scene.add(crown);
+        });
+    }
+}
+
+// 5. MUSEUM OF THE FUTURE
+const motfGroup = new THREE.Group();
+motfGroup.position.set(-280, 55, 950);
+motfGroup.rotation.y = Math.PI * 0.4;
+const motfRing = new THREE.Mesh(new THREE.TorusGeometry(55, 20, 24, 48), new THREE.MeshStandardMaterial({ color: 0xdadada, metalness: 0.95, roughness: 0.1 }));
+motfRing.scale.set(1.4, 0.9, 0.7);
+motfGroup.add(motfRing);
+
+const calligBand = new THREE.Mesh(new THREE.TorusGeometry(55, 20.5, 8, 24, Math.PI * 0.8), new THREE.MeshBasicMaterial({ color: 0x00ff88, wireframe: true }));
+calligBand.scale.set(1.4, 0.9, 0.7);
+motfGroup.add(calligBand);
+scene.add(motfGroup);
+
+// 6. THE DUBAI FRAME
+const frameGroup = new THREE.Group();
+frameGroup.position.set(950, 0, 2000);
+frameGroup.rotation.y = Math.PI * 0.3;
+const goldFrameMat = new THREE.MeshStandardMaterial({ color: 0xffb700, metalness: 0.9, roughness: 0.2 });
+
+const colL = new THREE.Mesh(new THREE.BoxGeometry(22, 280, 22), goldFrameMat); colL.position.set(-90, 140, 0); frameGroup.add(colL);
+const colR = new THREE.Mesh(new THREE.BoxGeometry(22, 280, 22), goldFrameMat); colR.position.set(90, 140, 0); frameGroup.add(colR);
+const skyBridge = new THREE.Mesh(new THREE.BoxGeometry(202, 24, 28), goldFrameMat); skyBridge.position.set(0, 275, 0); frameGroup.add(skyBridge);
+const frameBase = new THREE.Mesh(new THREE.BoxGeometry(202, 20, 28), goldFrameMat); frameBase.position.set(0, 10, 0); frameGroup.add(frameBase);
+scene.add(frameGroup);
+
+// 7. BURJ AL ARAB
+const burjAlArabGroup = new THREE.Group();
+burjAlArabGroup.position.set(-1800, 0, -1400);
+const isl = new THREE.Mesh(new THREE.CylinderGeometry(180, 190, 16, 32), new THREE.MeshStandardMaterial({ color: 0xd6c29b, roughness: 0.9 }));
+isl.position.y = 6;
+burjAlArabGroup.add(isl);
+
+const sailArch = new THREE.Mesh(new THREE.TorusGeometry(170, 22, 16, 36, Math.PI * 0.65), new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.2, metalness: 0.2 }));
+sailArch.rotation.z = -Math.PI / 2.3; sailArch.rotation.y = Math.PI / 2; sailArch.position.set(0, 180, 0);
+burjAlArabGroup.add(sailArch);
+
+const mast = new THREE.Mesh(new THREE.CylinderGeometry(8, 12, 350, 12), new THREE.MeshStandardMaterial({ color: 0x1a2e40, metalness: 0.8 }));
+mast.position.set(-35, 180, 0);
+burjAlArabGroup.add(mast);
+
+const helipad = new THREE.Mesh(new THREE.CylinderGeometry(32, 32, 4, 16), new THREE.MeshStandardMaterial({ color: 0x00ff88 }));
+helipad.position.set(28, 280, 0);
+burjAlArabGroup.add(helipad);
+scene.add(burjAlArabGroup);
+
+// 8. PALM JUMEIRAH & ATLANTIS
+const palmGroup = new THREE.Group();
+palmGroup.position.set(-600, 0, -2200);
+const palmSandMat = new THREE.MeshStandardMaterial({ color: 0xdeb887, roughness: 0.9 });
+const pTrunk = new THREE.Mesh(new THREE.BoxGeometry(90, 8, 900), palmSandMat); pTrunk.position.set(0, 2, 0); palmGroup.add(pTrunk);
+const crescent = new THREE.Mesh(new THREE.TorusGeometry(700, 45, 8, 36, Math.PI), palmSandMat); crescent.rotation.x = Math.PI / 2; crescent.position.set(0, 2, -450); palmGroup.add(crescent);
+
+const atlantisGroup = new THREE.Group();
+atlantisGroup.position.set(0, 10, -1150);
+const atlantisMat = new THREE.MeshStandardMaterial({ color: 0xe58e73, roughness: 0.4 });
+const wingL = new THREE.Mesh(new THREE.BoxGeometry(80, 90, 30), atlantisMat); wingL.position.set(-60, 45, 0); atlantisGroup.add(wingL);
+const wingR = new THREE.Mesh(new THREE.BoxGeometry(80, 90, 30), atlantisMat); wingR.position.set(60, 45, 0); atlantisGroup.add(wingR);
+const archTop = new THREE.Mesh(new THREE.BoxGeometry(60, 25, 30), atlantisMat); archTop.position.set(0, 80, 0); atlantisGroup.add(archTop);
+palmGroup.add(atlantisGroup);
+scene.add(palmGroup);
+
+// --- DUBAI AIR DEFENSE JET ---
+function createDubaiFighterJet(isEnemy = false) {
+    const jet = new THREE.Group();
+    const bodyMat = new THREE.MeshStandardMaterial({ color: (isEnemy ? 0x8b0000 : 0xffffff), metalness: 0.85, roughness: 0.2 });
+    const trimMat = new THREE.MeshStandardMaterial({ color: (isEnemy ? 0xff3b30 : 0x00ff88), metalness: 0.5, roughness: 0.3 });
+    const goldMat = new THREE.MeshStandardMaterial({ color: 0xffd700, metalness: 0.95, roughness: 0.1 });
+    const canopyMat = new THREE.MeshStandardMaterial({ color: 0x00e1ff, metalness: 0.9, roughness: 0.1, transparent: true, opacity: 0.8 });
+
+    const fuselage = new THREE.Mesh(new THREE.ConeGeometry(2.5, 20, 8), bodyMat);
+    fuselage.rotation.x = Math.PI / 2;
+    jet.add(fuselage);
+
+    const nose = new THREE.Mesh(new THREE.ConeGeometry(1.2, 5, 8), goldMat);
+    nose.rotation.x = Math.PI / 2; nose.position.z = -8;
+    jet.add(nose);
+
+    const cockpit = new THREE.Mesh(new THREE.SphereGeometry(1.4, 16, 16), canopyMat);
+    cockpit.scale.set(0.65, 0.8, 2.5); cockpit.position.set(0, 1.2, -1.8);
+    jet.add(cockpit);
+
+    const wingShape = new THREE.Shape();
+    wingShape.moveTo(0, 4); wingShape.lineTo(13, -4); wingShape.lineTo(13, -7); wingShape.lineTo(0, -3.5); wingShape.closePath();
+    const wingGeo = new THREE.ExtrudeGeometry(wingShape, { depth: 0.35, bevelEnabled: false });
+    const wingR = new THREE.Mesh(wingGeo, trimMat); wingR.rotation.x = Math.PI / 2; jet.add(wingR);
+    const wingL = wingR.clone(); wingL.scale.x = -1; jet.add(wingL);
+
+    const finGeo = new THREE.BoxGeometry(0.3, 3.6, 4.5);
+    const finL = new THREE.Mesh(finGeo, goldMat); finL.position.set(-2, 2, 6); finL.rotation.z = -0.22; jet.add(finL);
+    const finR = new THREE.Mesh(finGeo, goldMat); finR.position.set(2, 2, 6); finR.rotation.z = 0.22; jet.add(finR);
+
+    const flameL = new THREE.Mesh(new THREE.ConeGeometry(0.7, 4.5, 12), new THREE.MeshBasicMaterial({ color: (isEnemy ? 0xff2200 : 0x00ffcc) }));
+    flameL.rotation.x = -Math.PI / 2; flameL.position.set(-1.2, 0, 10.5); jet.add(flameL);
+    const flameR = flameL.clone(); flameR.position.x = 1.2; jet.add(flameR);
+
+    jet.userData = { flameL, flameR };
+    return jet;
+}
+
+const localJet = createDubaiFighterJet(false);
+localJet.position.set(0, 320, 1400);
+scene.add(localJet);
+
+const flight = {
+    speed: 3.8,
+    boostSpeed: 10.5,
+    pitchRate: 0.038,
+    rollRate: 0.055,
+    yawRate: 0.022,
+    health: 100,
+    alive: true,
+    name: "FALCON-1"
+};
+
+const keys = { w: false, s: false, a: false, d: false, q: false, e: false, shift: false, space: false, m: false, l: false };
+const cheats = { laser: false, god: false, speed: false, rapid: false };
+const bullets = [];
+const missiles = [];
+const particles = [];
+let lastShot = 0;
+let lastMissile = 0;
+const remotePlayers = {};
+
+function fireCannons() {
+    SoundFX.cannon();
+    const forward = new THREE.Vector3(0, 0, -1).applyQuaternion(localJet.quaternion);
+    [-2.2, 2.2].forEach(offset => {
+        const b = new THREE.Mesh(new THREE.CylinderGeometry(0.35, 0.35, 6, 6), new THREE.MeshBasicMaterial({ color: cheats.rapid ? 0xff0055 : 0x00ff88 }));
+        b.quaternion.copy(localJet.quaternion); b.rotateX(Math.PI / 2);
+        const wingOff = new THREE.Vector3(offset, 0, -1).applyQuaternion(localJet.quaternion);
+        b.position.copy(localJet.position).add(wingOff);
+        bullets.push({ mesh: b, velocity: forward.clone().multiplyScalar(flight.speed + 17), life: 100, owner: peer ? peer.id : 'local' });
+        scene.add(b);
+    });
+    broadcast({
+        type: 'shoot',
+        pos: { x: localJet.position.x, y: localJet.position.y, z: localJet.position.z },
+        quat: { x: localJet.quaternion.x, y: localJet.quaternion.y, z: localJet.quaternion.z, w: localJet.quaternion.w }
     });
 }
 
-function resize() { canvas.width = window.innerWidth; canvas.height = window.innerHeight; }
-window.addEventListener('resize', resize);
-resize();
+function fireMissile() {
+    SoundFX.missile();
+    const forward = new THREE.Vector3(0, 0, -1).applyQuaternion(localJet.quaternion);
+    const mMesh = new THREE.Mesh(new THREE.CylinderGeometry(0.6, 0.7, 7, 8), new THREE.MeshStandardMaterial({ color: 0xffd700, metalness: 0.8 }));
+    mMesh.quaternion.copy(localJet.quaternion); mMesh.rotateX(Math.PI / 2);
+    mMesh.position.copy(localJet.position).add(forward.clone().multiplyScalar(5));
 
-// --- UI FUNCTIONS ---
-function toggleAdminPanel() {
-    const panel = document.getElementById('adminPanel');
-    panel.style.display = (panel.style.display === 'block') ? 'none' : 'block';
+    let nearest = null;
+    let minDist = 4000;
+    Object.values(remotePlayers).forEach(p => {
+        const d = p.mesh.position.distanceTo(localJet.position);
+        if (d < minDist) { minDist = d; nearest = p.mesh; }
+    });
+
+    missiles.push({ mesh: mMesh, target: nearest, velocity: forward.clone().multiplyScalar(flight.speed + 9), life: 250, owner: peer ? peer.id : 'local' });
+    scene.add(mMesh);
+    showNotification("🚀 FALCON MISSILE TRACKING");
 }
 
-function setStatus(msg) { document.getElementById('statusMsg').innerText = msg; }
-function notify(msg) { 
-    const n = document.getElementById('notification'); n.innerText = msg; 
-    setTimeout(() => n.innerText = '', 2000); 
-}
-
-function addKillFeed(msg) {
-    const feed = document.getElementById('killFeed');
-    const div = document.createElement('div');
-    div.className = 'kill-msg';
-    div.innerText = msg;
-    feed.appendChild(div);
-    setTimeout(() => { div.style.opacity = 0; setTimeout(()=>div.remove(), 1000); }, 4000);
-}
-
-function startGameUI(code) {
-    document.getElementById('menu').style.display = 'none';
-    document.getElementById('connectionStatus').innerText = `ROOM: ${code}`;
-}
-
-// --- TOUCH CONTROLS ---
-window.addEventListener('touchstart', function onFirstTouch() {
-    isTouchDevice = true;
-    document.getElementById('touchControls').style.display = 'block';
-    window.removeEventListener('touchstart', onFirstTouch, false);
-}, false);
-
-function bindTouch(btnId, keyName) {
-    const btn = document.getElementById(btnId);
-    if (!btn) return;
-    btn.addEventListener('touchstart', (e) => { e.preventDefault(); keys[keyName] = true; });
-    btn.addEventListener('touchend', (e) => { e.preventDefault(); keys[keyName] = false; });
-}
-
-bindTouch('btnW', 'w');
-bindTouch('btnA', 'a');
-bindTouch('btnS', 's');
-bindTouch('btnD', 'd');
-bindTouch('btnSpace', 'Space');
-bindTouch('btnM', 'm');
-bindTouch('btnShift', 'Shift');
-bindTouch('btnL', 'l'); // Bind the new Laser button
-
-// --- ADMIN ---
-function unlockAdmin() {
-    const pass = document.getElementById('adminPass').value;
-    if (isHost) {
-        if (pass === ADMIN_PASSWORD) activateAdminUI();
-        else notify("WRONG PIN");
-    } else if (conn) {
-        conn.send({ type: 'admin_req', pass: pass });
+function createExplosion(pos, color = 0xff6600, count = 28) {
+    SoundFX.explosion();
+    for (let i = 0; i < count; i++) {
+        const p = new THREE.Mesh(new THREE.SphereGeometry(1.2 + Math.random() * 2, 6, 6), new THREE.MeshBasicMaterial({ color: color }));
+        p.position.copy(pos);
+        const vel = new THREE.Vector3((Math.random() - 0.5) * 7, (Math.random() - 0.5) * 7, (Math.random() - 0.5) * 7);
+        particles.push({ mesh: p, vel, life: 45 });
+        scene.add(p);
     }
 }
 
-function activateAdminUI() {
-    isAdmin = true;
-    document.getElementById('loginSection').style.display = 'none';
-    document.getElementById('cheatSection').style.display = 'block';
-    
-    // Show Laser button on touch devices
-    document.getElementById('btnL').style.display = 'block';
-    
-    notify("ADMIN ACCESS GRANTED");
-}
-
-function toggleCheat(cheat) {
-    if (!isAdmin) return;
-    if (cheat === 'nuke') {
-        if (isHost) performNuke(myId);
-        else conn.send({ type: 'cheat_toggle', cheat: 'nuke' });
+// Laser Cheat Beam
+let laserBeam = null;
+function updateLaserBeam() {
+    if (!cheats.laser || !keys.l) {
+        if (laserBeam) { scene.remove(laserBeam); laserBeam = null; }
         return;
     }
-
-    const btn = document.getElementById('btn' + cheat.charAt(0).toUpperCase() + cheat.slice(1));
-    btn.classList.toggle('active');
-
-    if (isHost) {
-        const p = players[myId];
-        if (cheat === 'god') p.godMode = !p.godMode;
-        if (cheat === 'speed') p.superSpeed = !p.superSpeed;
-        if (cheat === 'rapid') p.rapidFire = !p.rapidFire;
-        if (cheat === 'laser') p.hasLaser = !p.hasLaser;
-    } else {
-        conn.send({ type: 'cheat_toggle', cheat: cheat });
+    if (!laserBeam) {
+        laserBeam = new THREE.Mesh(new THREE.CylinderGeometry(0.9, 0.9, 1400, 8), new THREE.MeshBasicMaterial({ color: 0x00ffff, transparent: true, opacity: 0.85 }));
+        scene.add(laserBeam);
     }
-}
+    const forward = new THREE.Vector3(0, 0, -1).applyQuaternion(localJet.quaternion);
+    laserBeam.quaternion.copy(localJet.quaternion);
+    laserBeam.rotateX(Math.PI / 2);
+    laserBeam.position.copy(localJet.position).add(forward.clone().multiplyScalar(700));
 
-function performNuke(sourceId) {
-    for(let pid in players) {
-        if (pid !== sourceId) {
-            takeDamage(players[pid], 9999, players[sourceId].name);
+    const ray = new THREE.Raycaster(localJet.position, forward, 0, 1400);
+    Object.entries(remotePlayers).forEach(([id, p]) => {
+        const hits = ray.intersectObject(p.mesh, true);
+        if (hits.length > 0) {
+            broadcast({ type: 'hit', targetId: id, damage: 4.0 });
+            createExplosion(hits[0].point, 0x00ffff, 4);
         }
-    }
-    notify("☢️ TACTICAL NUKE DETONATED ☢️");
+    });
 }
 
-// --- NETWORKING ---
-function getUsername() {
-    const name = document.getElementById('username').value.trim();
-    return name || "Pilot " + Math.floor(Math.random()*100);
+// --- 4-DIGIT MULTIPLAYER NETWORKING (PeerJS) ---
+let peer = null;
+let connections = [];
+let currentRoomCode = null;
+
+function generate4DigitCode() {
+    return Math.floor(1000 + Math.random() * 9000).toString();
 }
 
 function hostGame() {
-    myName = getUsername();
-    const code = Math.floor(1000 + Math.random() * 9000).toString();
-    setStatus("Initializing World...");
-    
-    peer = new Peer(APP_PREFIX + code);
+    SoundFX.init();
+    flight.name = document.getElementById('username').value.trim() || 'FALCON-LEAD';
+    currentRoomCode = generate4DigitCode();
+    const peerId = 'dubai-sky-' + currentRoomCode;
+
+    peer = new Peer(peerId);
 
     peer.on('open', (id) => {
-        myId = id;
-        isHost = true;
-        startGameUI(code);
-        players[myId] = createPlayer(myId, true, myName);
-        requestAnimationFrame(gameLoopHost);
+        document.getElementById('menu').style.display = 'none';
+        document.getElementById('generatedCodeDisplay').innerText = currentRoomCode;
+        document.getElementById('hostModal').style.display = 'flex';
+        document.getElementById('hudCode').innerText = `SQUAD [ ${currentRoomCode} ] (HOST)`;
     });
 
-    peer.on('connection', (c) => {
-        connections.push(c);
-        c.on('data', (data) => handlePacket(data, c.peer));
-        c.on('close', () => { 
-            delete players[c.peer]; 
-            connections = connections.filter(x => x.peer !== c.peer); 
-        });
+    peer.on('connection', (conn) => { setupConn(conn); });
+
+    peer.on('error', (err) => {
+        if (err.type === 'unavailable-id') {
+            hostGame();
+        } else {
+            document.getElementById('statusMsg').innerText = "Signal error. Try again.";
+        }
     });
-    
-    peer.on('error', err => alert("Net Error: " + err.type));
+}
+
+function copyCode() {
+    if (currentRoomCode) {
+        navigator.clipboard.writeText(currentRoomCode);
+        showNotification("CODE COPIED: " + currentRoomCode);
+    }
+}
+
+function closeHostModalAndFly() {
+    document.getElementById('hostModal').style.display = 'none';
+    showNotification("AIR DEFENSE DEPLOYED: SQUAD " + currentRoomCode);
 }
 
 function joinGame() {
-    myName = getUsername();
-    const code = document.getElementById('joinCode').value;
-    if (code.length !== 4) return alert("Code must be 4 digits");
-    
-    setStatus("Connecting...");
-    peer = new Peer(); 
+    SoundFX.init();
+    flight.name = document.getElementById('username').value.trim() || 'FALCON-WING';
+    const code = document.getElementById('joinCode').value.trim();
+    if (code.length !== 4 || isNaN(code)) {
+        alert("Enter a valid 4-digit squad code!");
+        return;
+    }
+
+    currentRoomCode = code;
+    peer = new Peer();
 
     peer.on('open', (id) => {
-        myId = id;
-        const hostId = APP_PREFIX + code;
-        conn = peer.connect(hostId);
+        const hostPeerId = 'dubai-sky-' + currentRoomCode;
+        const conn = peer.connect(hostPeerId);
+        setupConn(conn);
+        document.getElementById('menu').style.display = 'none';
+        document.getElementById('hudCode').innerText = `SQUAD [ ${currentRoomCode} ]`;
+        showNotification("INTERCEPTOR SCRAMBLED: JOINING " + currentRoomCode);
+    });
 
-        conn.on('open', () => {
-            isHost = false;
-            startGameUI(code);
-            conn.send({ type: 'join', name: myName });
+    peer.on('error', () => {
+        document.getElementById('statusMsg').innerText = "Airspace squad not found. Verify 4-digit code.";
+    });
+}
+
+function setupConn(conn) {
+    connections.push(conn);
+    conn.on('open', () => {
+        conn.send({ type: 'join', name: flight.name, pos: localJet.position });
+    });
+    conn.on('data', (data) => {
+        handleNetworkData(conn, data);
+    });
+    conn.on('close', () => {
+        removeRemotePlayer(conn.peer);
+    });
+}
+
+function broadcast(msg) {
+    connections.forEach(c => { if (c.open) c.send(msg); });
+}
+
+function handleNetworkData(conn, data) {
+    if (data.type === 'join') {
+        createRemotePlayer(conn.peer, data.name, data.pos);
+        conn.send({ type: 'sync_ack', name: flight.name, pos: localJet.position });
+    }
+    else if (data.type === 'sync_ack') {
+        createRemotePlayer(conn.peer, data.name, data.pos);
+    }
+    else if (data.type === 'state') {
+        const p = remotePlayers[conn.peer];
+        if (p) {
+            p.targetPos.set(data.pos.x, data.pos.y, data.pos.z);
+            p.targetQuat.set(data.quat.x, data.quat.y, data.quat.z, data.quat.w);
+            p.health = data.health;
+        }
+    }
+    else if (data.type === 'shoot') {
+        const b = new THREE.Mesh(new THREE.CylinderGeometry(0.35, 0.35, 6, 6), new THREE.MeshBasicMaterial({ color: 0xff3b30 }));
+        b.quaternion.set(data.quat.x, data.quat.y, data.quat.z, data.quat.w);
+        b.rotateX(Math.PI / 2);
+        b.position.set(data.pos.x, data.pos.y, data.pos.z);
+        const forward = new THREE.Vector3(0, 0, -1).applyQuaternion(b.quaternion);
+        bullets.push({ mesh: b, velocity: forward.multiplyScalar(flight.speed + 17), life: 100, owner: conn.peer });
+        scene.add(b);
+    }
+    else if (data.type === 'hit') {
+        if (data.targetId === (peer ? peer.id : '')) applyDamage(data.damage, "BOGEY");
+    }
+    else if (data.type === 'kill') {
+        addKillMessage(data.msg);
+    }
+    else if (data.type === 'nuke') {
+        showNotification("⚠️ TACTICAL EMP BLAST DETONATED ⚠️");
+        createExplosion(localJet.position, 0xff0055, 90);
+        if (!cheats.god) applyDamage(100, data.by);
+    }
+}
+
+function createRemotePlayer(id, name, pos) {
+    if (remotePlayers[id]) return;
+    const mesh = createDubaiFighterJet(true);
+    if (pos) mesh.position.set(pos.x, pos.y, pos.z);
+    scene.add(mesh);
+
+    remotePlayers[id] = {
+        name: name || "BANDIT",
+        mesh: mesh,
+        health: 100,
+        targetPos: mesh.position.clone(),
+        targetQuat: mesh.quaternion.clone()
+    };
+    showNotification(`RADAR CONTACT: ${name}`);
+}
+
+function removeRemotePlayer(id) {
+    if (remotePlayers[id]) {
+        scene.remove(remotePlayers[id].mesh);
+        delete remotePlayers[id];
+    }
+}
+
+function applyDamage(amount, source) {
+    if (cheats.god || !flight.alive) return;
+    flight.health -= amount;
+    if (flight.health < 0) flight.health = 0;
+    document.getElementById('healthBar').style.width = flight.health + '%';
+
+    if (flight.health <= 0) {
+        flight.alive = false;
+        createExplosion(localJet.position, 0xff3300, 70);
+        localJet.visible = false;
+        const msg = `${source} SHOT DOWN ${flight.name}`;
+        addKillMessage(msg);
+        broadcast({ type: 'kill', msg: msg });
+        showNotification("HULL BREACH - EJECTING OVER DUBAI...");
+
+        setTimeout(() => { respawnJet(); }, 3200);
+    }
+}
+
+function respawnJet() {
+    flight.health = 100;
+    flight.alive = true;
+    localJet.visible = true;
+    localJet.position.set((Math.random() - 0.5) * 800, 320, 1000 + Math.random() * 800);
+    localJet.quaternion.set(0, 0, 0, 1);
+    document.getElementById('healthBar').style.width = '100%';
+}
+
+function addKillMessage(msg) {
+    const kf = document.getElementById('killFeed');
+    const div = document.createElement('div');
+    div.className = 'kill-msg';
+    div.innerText = msg;
+    kf.appendChild(div);
+    setTimeout(() => { div.style.opacity = '0'; setTimeout(() => div.remove(), 1000); }, 4000);
+}
+
+function showNotification(txt) {
+    const n = document.getElementById('notification');
+    n.innerText = txt;
+    n.style.opacity = '1';
+    setTimeout(() => { n.style.opacity = '0'; }, 2200);
+}
+
+// --- CONTROLS ---
+window.addEventListener('keydown', (e) => {
+    const k = e.key.toLowerCase();
+    if (keys.hasOwnProperty(k)) keys[k] = true;
+    if (e.key === 'Shift') keys.shift = true;
+    if (e.code === 'Space') keys.space = true;
+});
+
+window.addEventListener('keyup', (e) => {
+    const k = e.key.toLowerCase();
+    if (keys.hasOwnProperty(k)) keys[k] = false;
+    if (e.key === 'Shift') keys.shift = false;
+    if (e.code === 'Space') keys.space = false;
+});
+
+function bindTouch(id, key) {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.addEventListener('touchstart', (e) => { e.preventDefault(); keys[key] = true; });
+    el.addEventListener('touchend', (e) => { e.preventDefault(); keys[key] = false; });
+}
+bindTouch('btnW', 'w');
+bindTouch('btnS', 's');
+bindTouch('btnA', 'a');
+bindTouch('btnD', 'd');
+bindTouch('btnShift', 'shift');
+bindTouch('btnSpace', 'space');
+bindTouch('btnM', 'm');
+bindTouch('btnL', 'l');
+
+window.addEventListener('resize', () => {
+    camera.aspect = window.innerWidth / window.innerHeight;
+    camera.updateProjectionMatrix();
+    renderer.setSize(window.innerWidth, window.innerHeight);
+});
+
+// Admin Cheat PIN: 8007
+function toggleAdminPanel() {
+    const p = document.getElementById('adminPanel');
+    p.style.display = p.style.display === 'block' ? 'none' : 'block';
+}
+
+function unlockAdmin() {
+    const pass = document.getElementById('adminPass').value;
+    if (pass === '8007') {
+        document.getElementById('loginSection').style.display = 'none';
+        document.getElementById('cheatSection').style.display = 'block';
+        showNotification("ROYAL VIP OVERRIDE ACTIVE");
+    } else {
+        alert("SECURITY CODE INVALID");
+    }
+}
+
+function toggleCheat(c) {
+    cheats[c] = !cheats[c];
+    const btn = document.getElementById('btn' + c.charAt(0).toUpperCase() + c.slice(1));
+    if (btn) btn.classList.toggle('active', cheats[c]);
+
+    if (c === 'laser') {
+        const btnL = document.getElementById('btnL');
+        if (btnL) btnL.style.display = cheats.laser ? 'block' : 'none';
+    } else if (c === 'nuke') {
+        broadcast({ type: 'nuke', by: flight.name });
+        showNotification("☢️ EMP SHOCKWAVE DISPATCHED");
+        createExplosion(localJet.position, 0xff0055, 100);
+        cheats.nuke = false;
+        if (btn) btn.classList.remove('active');
+    }
+}
+
+// --- MAIN LOOP ---
+const clock = new THREE.Clock();
+let atcTimer = 0;
+
+function animate() {
+    requestAnimationFrame(animate);
+    const delta = clock.getDelta();
+
+    // Cascading Burj Khalifa LED Light Animation
+    ledStrip.material.color.setHSL((Date.now() * 0.0003) % 1, 1, 0.5);
+
+    if (flight.alive) {
+        let curSpeed = keys.shift ? flight.boostSpeed : flight.speed;
+        if (cheats.speed) curSpeed *= 2.0;
+
+        const fScale = keys.shift ? 2.3 : 1.0;
+        localJet.userData.flameL.scale.set(1, fScale, 1);
+        localJet.userData.flameR.scale.set(1, fScale, 1);
+
+        if (keys.w) localJet.rotateX(flight.pitchRate);
+        if (keys.s) localJet.rotateX(-flight.pitchRate);
+        if (keys.a) localJet.rotateZ(flight.rollRate);
+        if (keys.d) localJet.rotateZ(-flight.rollRate);
+        if (keys.q) localJet.rotateY(flight.yawRate);
+        if (keys.e) localJet.rotateY(-flight.yawRate);
+
+        const forward = new THREE.Vector3(0, 0, -1).applyQuaternion(localJet.quaternion);
+        localJet.position.add(forward.multiplyScalar(curSpeed));
+
+        if (localJet.position.y < 12) {
+            localJet.position.y = 12;
+            applyDamage(100, "TERRAIN IMPACT");
+        }
+
+        const camOffset = new THREE.Vector3(0, 7.5, 25).applyQuaternion(localJet.quaternion);
+        camera.position.lerp(localJet.position.clone().add(camOffset), 0.12);
+        camera.lookAt(localJet.position.clone().add(forward.clone().multiplyScalar(45)));
+
+        const now = performance.now();
+        const fireGap = cheats.rapid ? 60 : 150;
+        if (keys.space && now - lastShot > fireGap) {
+            fireCannons();
+            lastShot = now;
+        }
+        if (keys.m && now - lastMissile > 1100) {
+            fireMissile();
+            lastMissile = now;
+        }
+        updateLaserBeam();
+
+        broadcast({
+            type: 'state',
+            pos: { x: localJet.position.x, y: localJet.position.y, z: localJet.position.z },
+            quat: { x: localJet.quaternion.x, y: localJet.quaternion.y, z: localJet.quaternion.z, w: localJet.quaternion.w },
+            health: flight.health
         });
 
-        conn.on('data', (data) => handlePacket(data));
-        conn.on('close', () => { alert("Host Ended Session"); location.reload(); });
-    });
-    
-    peer.on('error', err => {
-         if (err.type === 'peer-unavailable') alert("Game ID not found!");
-         else alert("Error: " + err.type);
-    });
-}
+        // Landmark Zone Identifier on HUD
+        const jx = localJet.position.x, jz = localJet.position.z;
+        let sector = "SECTOR: ARABIAN GULF PATROL";
+        if (jz > 0 && jz < 1200 && Math.abs(jx) < 600) sector = "OVERFLYING: BURJ KHALIFA & DOWNTOWN";
+        else if (Math.abs(jx) < 200 && jz > -2000 && jz < 3500) sector = "OVERFLYING: SHEIKH ZAYED ROAD";
+        else if (jx < -1200 && jz < -800) sector = "OVERFLYING: BURJ AL ARAB";
+        else if (jz < -1600 && Math.abs(jx) < 1000) sector = "OVERFLYING: PALM JUMEIRAH & ATLANTIS";
+        else if (jx > 600 && jz > 1400) sector = "OVERFLYING: THE DUBAI FRAME";
+        else if (jx < -200 && jz > 700 && jz < 1200) sector = "OVERFLYING: MUSEUM OF THE FUTURE";
 
-function handlePacket(data, senderId) {
-    if (isHost) {
-        if (data.type === 'join') {
-            players[senderId] = createPlayer(senderId, false, data.name || "Unknown");
-            addKillFeed(`${data.name} joined the airspace`);
-        }
-        const p = players[senderId];
-        if (!p) return;
+        document.getElementById('landmarkBeacon').innerText = sector;
+        document.getElementById('speedGauge').innerText = `THRUST: ${keys.shift ? '150% [SUPERSONIC]' : '100%'} | MACH ${(curSpeed * 0.28).toFixed(1)}`;
+        document.getElementById('altGauge').innerText = `ALT: ${Math.round(localJet.position.y * 3.28)} FT`;
+    }
 
-        if (data.type === 'input') p.keys = data.keys;
-        if (data.type === 'admin_req') {
-            if (data.pass === ADMIN_PASSWORD) {
-                const c = connections.find(x => x.peer === senderId);
-                if(c) c.send({ type: 'admin_granted' });
-            }
-        }
-        if (data.type === 'cheat_toggle') {
-            if (data.cheat === 'god') p.godMode = !p.godMode;
-            if (data.cheat === 'speed') p.superSpeed = !p.superSpeed;
-            if (data.cheat === 'rapid') p.rapidFire = !p.rapidFire;
-            if (data.cheat === 'laser') p.hasLaser = !p.hasLaser;
-            if (data.cheat === 'nuke') performNuke(senderId);
-        }
+    // Radio Chatter Simulation
+    atcTimer += delta;
+    if (atcTimer > 8) {
+        atcTimer = 0;
+        const msgs = [
+            "DUBAI ATC: RADAR CLEAR OVER BURJ KHALIFA CORRIDOR",
+            "TOWER: SHEIKH ZAYED AIRSPACE RESTRICTED TO MACH 2",
+            "RADAR: MONITORING OFFSHORE SECTOR BURJ AL ARAB",
+            "EMIRATES COMMAND: SQUADRON PATROL EN ROUTE TO PALM JUMEIRAH"
+        ];
+        document.getElementById('atcChatter').innerText = msgs[Math.floor(Math.random() * msgs.length)];
+    }
+
+    let closestEnemyDist = 9999;
+    Object.values(remotePlayers).forEach(p => {
+        p.mesh.position.lerp(p.targetPos, 0.22);
+        p.mesh.quaternion.slerp(p.targetQuat, 0.22);
+        const d = p.mesh.position.distanceTo(localJet.position);
+        if (d < closestEnemyDist) closestEnemyDist = d;
+    });
+
+    if (closestEnemyDist < 3000) {
+        document.getElementById('lockState').innerText = closestEnemyDist < 1200 ? "RADAR LOCK CONFIRMED" : `BANDIT ${Math.round(closestEnemyDist)}M`;
+        document.getElementById('lockState').style.color = closestEnemyDist < 1200 ? "#ff3366" : "#ffd700";
     } else {
-        if (data.type === 'update') {
-            players = data.players;
-            projectiles = data.projectiles;
-            lasers = data.lasers;
-            particles = data.particles;
-            
-            if (data.newKills) data.newKills.forEach(msg => addKillFeed(msg));
-            
-            drawGame();
-            updateHUD();
-        }
-        if (data.type === 'admin_granted') activateAdminUI();
-    }
-}
-
-// --- GAME ENGINE ---
-function createPlayer(id, isHost, name) {
-    return {
-        id: id,
-        name: name,
-        x: Math.random() * WORLD_SIZE,
-        y: Math.random() * WORLD_SIZE,
-        angle: Math.random() * 6.28,
-        color: `hsl(${Math.random() * 360}, 100%, 50%)`,
-        keys: { w:false, a:false, s:false, d:false, Space:false, m:false, l:false, Shift:false },
-        hp: 100, maxHp: 100, dead: false,
-        speed: 5, throttle: 0.5,
-        bulletCD: 0, missileCD: 0, laserCD: 0, boostFuel: 100,
-        godMode: false, rapidFire: false, hasLaser: false, superSpeed: false
-    };
-}
-
-function gameLoopHost() {
-    let newKills = [];
-    lasers = []; // Reset lasers every frame for continuous beam logic
-
-    for (let id in players) {
-        const p = players[id];
-        if (p.dead) {
-            if (Math.random() < 0.005) { 
-                p.dead = false; p.hp = 100; p.boostFuel = 100;
-                p.x = Math.random()*WORLD_SIZE; p.y = Math.random()*WORLD_SIZE; 
-            }
-            continue;
-        }
-
-        const input = (id === myId) ? keys : p.keys;
-
-        if (input.a) p.angle -= 0.08;
-        if (input.d) p.angle += 0.08;
-        if (input.w && p.throttle < 1.0) p.throttle += 0.01;
-        if (input.s && p.throttle > 0.2) p.throttle -= 0.02;
-
-        let boostMult = 1;
-        if (input.Shift && p.boostFuel > 0) {
-            boostMult = 1.5;
-            p.boostFuel -= 1;
-        } else if (p.boostFuel < 100) {
-            p.boostFuel += 0.2;
-        }
-
-        let baseMax = p.superSpeed ? 25 : MAX_SPEED;
-        p.speed = p.throttle * baseMax * boostMult;
-
-        p.x += Math.cos(p.angle) * p.speed;
-        p.y += Math.sin(p.angle) * p.speed;
-
-        if(p.x < 0) p.x = 0; if(p.x > WORLD_SIZE) p.x = WORLD_SIZE;
-        if(p.y < 0) p.y = 0; if(p.y > WORLD_SIZE) p.y = WORLD_SIZE;
-
-        if (input.Space) fireBullet(p);
-        if (input.m) fireMissile(p);
-        
-        // Continuous Laser Check
-        if (input.l && p.hasLaser) {
-            lasers.push({ x: p.x, y: p.y, angle: p.angle, owner: p.id });
-        }
-
-        if (p.bulletCD > 0) p.bulletCD--;
-        if (p.missileCD > 0) p.missileCD--;
+        document.getElementById('lockState').innerText = "AIRSPACE CLEAR";
+        document.getElementById('lockState').style.color = "rgba(0,255,136,0.7)";
     }
 
-    updateProjectiles(newKills); // Handles bullets and missiles
-    updateLasers(newKills);      // NEW: Handles immediate laser rays
-    updateParticles();
-
-    const packet = { type: 'update', players, projectiles, lasers, particles, newKills };
-    connections.forEach(c => c.send(packet));
-    
-    newKills.forEach(msg => addKillFeed(msg));
-
-    drawGame();
-    updateHUD();
-    requestAnimationFrame(gameLoopHost);
-}
-
-function fireBullet(p) {
-    if (p.bulletCD > 0) return;
-    projectiles.push({ x: p.x, y: p.y, angle: p.angle, speed: p.speed + 12, type: 'bullet', owner: p.id, life: 50 });
-    p.bulletCD = p.rapidFire ? 4 : 10;
-}
-
-function fireMissile(p) {
-    if (p.missileCD > 0) return;
-    let targetId = null, minDist = Infinity;
-    for(let pid in players) {
-        if(pid !== p.id && !players[pid].dead) {
-            const d = Math.hypot(players[pid].x - p.x, players[pid].y - p.y);
-            if(d < minDist) { minDist = d; targetId = pid; }
-        }
-    }
-    projectiles.push({ x: p.x, y: p.y, angle: p.angle, speed: p.speed + 5, type: 'missile', owner: p.id, target: targetId, life: 200 });
-    p.missileCD = p.rapidFire ? 15 : 100;
-}
-
-// Replaces old projectile based laser logic with hitscan
-function updateLasers(killList) {
-    for (let i = 0; i < lasers.length; i++) {
-        const l = lasers[i];
-        
-        // Check collisions for this beam against all players
-        for (let pid in players) {
-            const p = players[pid];
-            if (p.id !== l.owner && !p.dead && !p.godMode) {
-                // Ray-Circle Intersection approximation
-                const dx = p.x - l.x;
-                const dy = p.y - l.y;
-                
-                // Dot product to ensure target is in front of laser
-                const dot = dx * Math.cos(l.angle) + dy * Math.sin(l.angle);
-                
-                // Perpendicular distance from line
-                const dist = Math.abs(dy * Math.cos(l.angle) - dx * Math.sin(l.angle));
-                
-                // If close to line and in front, and within range (2000px)
-                if (dist < 20 && dot > 0 && dot < 2000) {
-                    let killerName = players[l.owner] ? players[l.owner].name : "Laser";
-                    // Continuous damage per frame (very fast)
-                    takeDamage(p, 2, killerName, killList);
-                    createExplosion(p.x, p.y, 'cyan', 1);
+    for (let i = bullets.length - 1; i >= 0; i--) {
+        const b = bullets[i];
+        b.mesh.position.add(b.velocity);
+        b.life--;
+        if (b.owner === (peer ? peer.id : 'local')) {
+            Object.entries(remotePlayers).forEach(([id, p]) => {
+                if (b.mesh.position.distanceTo(p.mesh.position) < 8.5) {
+                    b.life = 0;
+                    createExplosion(b.mesh.position, 0x00ff88, 10);
+                    broadcast({ type: 'hit', targetId: id, damage: 16 });
                 }
-            }
+            });
         }
+        if (b.life <= 0) { scene.remove(b.mesh); bullets.splice(i, 1); }
     }
-}
 
-function updateProjectiles(killList) {
-    for (let i = projectiles.length - 1; i >= 0; i--) {
-        const proj = projectiles[i];
-        
-        if (proj.type === 'missile' && proj.target && players[proj.target] && !players[proj.target].dead) {
-            const t = players[proj.target];
-            const desired = Math.atan2(t.y - proj.y, t.x - proj.x);
-            let diff = desired - proj.angle;
-            while (diff <= -Math.PI) diff += Math.PI * 2;
-            while (diff > Math.PI) diff -= Math.PI * 2;
-            proj.angle += Math.sign(diff) * 0.1;
+    for (let i = missiles.length - 1; i >= 0; i--) {
+        const m = missiles[i];
+        if (m.target) {
+            const des = m.target.position.clone().sub(m.mesh.position).normalize();
+            m.velocity.lerp(des.multiplyScalar(flight.speed + 12), 0.08);
+            m.mesh.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), m.velocity.clone().normalize());
+            m.mesh.rotateX(Math.PI / 2);
+        }
+        m.mesh.position.add(m.velocity);
+        m.life--;
+
+        if (Math.random() > 0.4) {
+            const smoke = new THREE.Mesh(new THREE.SphereGeometry(0.9, 4, 4), new THREE.MeshBasicMaterial({ color: 0xeeeeee, transparent: true, opacity: 0.5 }));
+            smoke.position.copy(m.mesh.position);
+            particles.push({ mesh: smoke, vel: new THREE.Vector3(), life: 25 });
+            scene.add(smoke);
         }
 
-        proj.x += Math.cos(proj.angle) * proj.speed;
-        proj.y += Math.sin(proj.angle) * proj.speed;
-        proj.life--;
-
-        let hit = false;
-        if (proj.x < 0 || proj.x > WORLD_SIZE || proj.y < 0 || proj.y > WORLD_SIZE) hit = true;
-        
-        for (let pid in players) {
-            const p = players[pid];
-            if (p.id !== proj.owner && !p.dead && !p.godMode) {
-                if (Math.hypot(p.x - proj.x, p.y - proj.y) < 25) {
-                    let killerName = players[proj.owner] ? players[proj.owner].name : "Unknown";
-                    takeDamage(p, proj.type === 'missile' ? 40 : 10, killerName, killList);
-                    hit = true;
-                    createExplosion(proj.x, proj.y, 'orange');
-                    break;
-                }
-            }
+        if (m.target && m.mesh.position.distanceTo(m.target.position) < 12) {
+            createExplosion(m.mesh.position, 0xff3300, 32);
+            Object.entries(remotePlayers).forEach(([id, p]) => {
+                if (p.mesh === m.target) broadcast({ type: 'hit', targetId: id, damage: 65 });
+            });
+            m.life = 0;
         }
-        if (hit || proj.life <= 0) projectiles.splice(i, 1);
+        if (m.life <= 0) { scene.remove(m.mesh); missiles.splice(i, 1); }
     }
-}
 
-function updateParticles() {
     for (let i = particles.length - 1; i >= 0; i--) {
         const pt = particles[i];
-        pt.x += pt.vx; pt.y += pt.vy; pt.life--;
-        if (pt.life <= 0) particles.splice(i, 1);
-    }
-}
-
-function takeDamage(p, amt, killerName, killList) {
-    p.hp -= amt;
-    if (p.hp <= 0 && !p.dead) {
-        p.dead = true; p.hp = 0;
-        createExplosion(p.x, p.y, 'white', 50);
-        if (killList) killList.push(`${killerName} splashed ${p.name}`);
-        return true;
-    }
-    return false;
-}
-
-function createExplosion(x, y, color, count=10) {
-    for(let i=0; i<count; i++) {
-        particles.push({
-            x, y, vx: (Math.random()-0.5)*15, vy: (Math.random()-0.5)*15,
-            life: Math.random()*20+10, color
-        });
-    }
-}
-
-// --- RENDER ---
-function drawGame() {
-    if (!players[myId]) return;
-    const me = players[myId];
-
-    ctx.setTransform(1, 0, 0, 1, 0, 0);
-    ctx.fillStyle = '#050505';
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
-    
-    ctx.save();
-    const cx = canvas.width / 2 - me.x;
-    const cy = canvas.height / 2 - me.y;
-    ctx.translate(cx, cy);
-
-    ctx.strokeStyle = '#333'; ctx.lineWidth = 10;
-    ctx.strokeRect(0, 0, WORLD_SIZE, WORLD_SIZE);
-
-    ctx.fillStyle = '#fff';
-    stars.forEach(s => { ctx.beginPath(); ctx.arc(s.x, s.y, s.size, 0, Math.PI*2); ctx.fill(); });
-
-    // Draw Continuous Lasers
-    lasers.forEach(l => {
-        ctx.save(); ctx.translate(l.x, l.y); ctx.rotate(l.angle);
-        ctx.strokeStyle = '#0ff'; ctx.lineWidth = 6; ctx.shadowBlur = 10; ctx.shadowColor = '#0ff';
-        ctx.beginPath(); ctx.moveTo(0,0); ctx.lineTo(2000,0); ctx.stroke(); ctx.restore();
-    });
-
-    projectiles.forEach(p => {
-        ctx.save(); ctx.translate(p.x, p.y); ctx.rotate(p.angle);
-        if (p.type === 'bullet') { ctx.fillStyle = 'yellow'; ctx.fillRect(-4, -2, 8, 4); }
-        else { ctx.fillStyle = 'red'; ctx.fillRect(-6, -3, 12, 6); }
-        ctx.restore();
-    });
-
-    for (let id in players) {
-        const p = players[id];
-        if (p.dead) continue;
-        
-        ctx.save(); ctx.translate(p.x, p.y); 
-        ctx.fillStyle = 'white'; ctx.font = 'bold 12px Arial'; ctx.textAlign = 'center';
-        ctx.fillText(p.name, 0, -40);
-        ctx.fillStyle = 'red'; ctx.fillRect(-20, -35, 40, 4);
-        ctx.fillStyle = '#0f0'; ctx.fillRect(-20, -35, 40 * (p.hp/p.maxHp), 4);
-        ctx.fillStyle = '#0ff'; ctx.fillRect(-20, -30, 40 * (p.boostFuel/100), 2);
-
-        ctx.rotate(p.angle);
-        ctx.fillStyle = p.godMode ? 'gold' : p.color;
-        ctx.beginPath(); ctx.moveTo(20,0); ctx.lineTo(-15,15); ctx.lineTo(-5,0); ctx.lineTo(-15,-15); ctx.fill();
-        
-        if (p.throttle > 0) {
-            ctx.fillStyle = inputActive(p, 'Shift') ? '#0ff' : 'orange';
-            ctx.beginPath(); ctx.moveTo(-15, 0); ctx.lineTo(-25 - (p.throttle*10), 0); ctx.lineTo(-15, 5); ctx.fill();
-        }
-        if (p.hasLaser || p.godMode) { ctx.strokeStyle = 'white'; ctx.lineWidth = 2; ctx.stroke(); }
-        ctx.restore();
+        pt.mesh.position.add(pt.vel);
+        pt.life--;
+        pt.mesh.scale.multiplyScalar(0.96);
+        if (pt.life <= 0) { scene.remove(pt.mesh); particles.splice(i, 1); }
     }
 
-    particles.forEach(pt => { ctx.fillStyle = pt.color; ctx.beginPath(); ctx.arc(pt.x, pt.y, 3, 0, Math.PI*2); ctx.fill(); });
-
-    ctx.restore();
-
-    if (isAdmin) drawMinimap(me);
+    renderer.render(scene, camera);
 }
 
-function inputActive(p, k) {
-    if (p.id === myId) return keys[k];
-    return p.keys[k];
-}
-
-function drawMinimap(me) {
-    const mapSize = 150;
-    const padding = 10;
-    const startX = canvas.width - mapSize - padding;
-    const startY = padding + 10;
-
-    ctx.fillStyle = 'rgba(0, 20, 0, 0.8)';
-    ctx.fillRect(startX, startY, mapSize, mapSize);
-    ctx.strokeStyle = '#0f0'; ctx.lineWidth = 2;
-    ctx.strokeRect(startX, startY, mapSize, mapSize);
-
-    for (let id in players) {
-        const p = players[id];
-        if (p.dead) continue;
-        const mapX = startX + (p.x / WORLD_SIZE) * mapSize;
-        const mapY = startY + (p.y / WORLD_SIZE) * mapSize;
-        ctx.fillStyle = (id === myId) ? '#fff' : 'red';
-        ctx.beginPath(); ctx.arc(mapX, mapY, 3, 0, Math.PI*2); ctx.fill();
-    }
-}
-
-function updateHUD() {
-    if (players[myId]) {
-        const p = players[myId];
-        const pct = Math.max(0, (p.hp / p.maxHp) * 100);
-        document.getElementById('healthBar').style.width = pct + '%';
-        document.getElementById('speedGauge').innerText = `THRUST: ${Math.round(p.throttle * 100)}% | BOOST: ${Math.round(p.boostFuel)}%`;
-        if (p.dead) notify("WASTED - Respawning...");
-    }
-}
-
-// --- INPUTS ---
-window.addEventListener('keydown', e => {
-    if (document.activeElement.tagName === 'INPUT') return; 
-    if(['ArrowUp','ArrowDown','ArrowLeft','ArrowRight',' '].includes(e.key)) e.preventDefault();
-    
-    const k = e.key.toLowerCase();
-    if (k === 'w' || e.key === 'ArrowUp') keys.w = true;
-    if (k === 's' || e.key === 'ArrowDown') keys.s = true;
-    if (k === 'a' || e.key === 'ArrowLeft') keys.a = true;
-    if (k === 'd' || e.key === 'ArrowRight') keys.d = true;
-    if (k === ' ') keys.Space = true;
-    if (k === 'm') keys.m = true;
-    if (k === 'l' && isAdmin) keys.l = true;
-    if (e.key === 'Shift') keys.Shift = true;
-});
-
-window.addEventListener('keyup', e => {
-    const k = e.key.toLowerCase();
-    if (k === 'w' || e.key === 'ArrowUp') keys.w = false;
-    if (k === 's' || e.key === 'ArrowDown') keys.s = false;
-    if (k === 'a' || e.key === 'ArrowLeft') keys.a = false;
-    if (k === 'd' || e.key === 'ArrowRight') keys.d = false;
-    if (k === ' ') keys.Space = false;
-    if (k === 'm') keys.m = false;
-    if (k === 'l') keys.l = false;
-    if (e.key === 'Shift') keys.Shift = false;
-});
-
-setInterval(() => {
-    if (!isHost && conn && conn.open) conn.send({ type: 'input', keys: keys });
-}, 50);
+animate();

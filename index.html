@@ -3,81 +3,475 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Sky Battle P2P</title>
-    <link rel="stylesheet" href="style.css">
+    <title>Dubai Sky Battle 3D</title>
+    <!-- Google Fonts for Dubai Luxury Cyber Styling -->
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@600;800;900&family=Rajdhani:wght@600;700&display=swap" rel="stylesheet">
+    <!-- Three.js 3D Engine -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <!-- PeerJS WebRTC P2P Multiplayer -->
     <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { 
+            margin: 0; 
+            background: #020712; 
+            color: #e0f8ff; 
+            font-family: 'Rajdhani', sans-serif; 
+            overflow: hidden; 
+            touch-action: none;
+            user-select: none;
+            width: 100vw;
+            height: 100vh;
+        }
+
+        #gameCanvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            display: block;
+            z-index: 1;
+        }
+
+        /* Dubai Luxury Gold & Midnight Glass Menu */
+        #menu { 
+            position: absolute; 
+            top: 50%; 
+            left: 50%; 
+            transform: translate(-50%, -50%); 
+            text-align: center; 
+            background: radial-gradient(circle at 50% 0%, rgba(18, 32, 52, 0.96), rgba(3, 8, 18, 0.98));
+            backdrop-filter: blur(16px);
+            padding: 35px 40px; 
+            border: 2px solid #ffd700; 
+            border-radius: 12px; 
+            z-index: 100; 
+            box-shadow: 0 0 45px rgba(255, 215, 0, 0.4), inset 0 0 25px rgba(0, 255, 136, 0.15);
+            max-width: 460px;
+            width: 90%;
+        }
+
+        .dubai-emblem {
+            font-family: 'Orbitron', sans-serif;
+            font-size: 11px;
+            letter-spacing: 4px;
+            color: #00ff88;
+            text-shadow: 0 0 10px rgba(0, 255, 136, 0.6);
+            margin-bottom: 6px;
+        }
+
+        .glow-gold { 
+            font-family: 'Orbitron', sans-serif;
+            font-size: 30px;
+            letter-spacing: 4px;
+            background: linear-gradient(135deg, #ffffff 10%, #ffd700 50%, #ff9900 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            font-weight: 900;
+        }
+
+        .skyline-badge {
+            font-size: 10px;
+            letter-spacing: 2px;
+            color: #00ffcc;
+            margin: 6px 0 20px 0;
+            opacity: 0.9;
+        }
+
+        .input-block { text-align: left; margin-bottom: 16px; }
+        .input-block label { display: block; font-size: 12px; letter-spacing: 2px; color: #ffd700; margin-bottom: 5px; }
+
+        input { 
+            width: 100%;
+            padding: 12px 14px; 
+            font-size: 18px; 
+            font-family: 'Orbitron', monospace;
+            text-transform: uppercase; 
+            text-align: center; 
+            letter-spacing: 3px; 
+            background: rgba(2, 6, 14, 0.85); 
+            color: #ffd700; 
+            border: 1px solid #ffd700; 
+            border-radius: 6px;
+            outline: none;
+            transition: 0.3s;
+        }
+        input:focus { border-color: #00ff88; box-shadow: 0 0 18px rgba(0, 255, 136, 0.6); }
+
+        .action-grid { display: flex; flex-direction: column; gap: 10px; }
+
+        button { 
+            font-family: 'Orbitron', sans-serif;
+            padding: 13px 20px; 
+            font-size: 14px; 
+            cursor: pointer; 
+            border: none; 
+            border-radius: 6px;
+            font-weight: 700; 
+            letter-spacing: 2px;
+            transition: 0.25s all; 
+        }
+        .gold-btn {
+            background: linear-gradient(135deg, #ffd700, #ff9900);
+            color: #050a12;
+            box-shadow: 0 0 20px rgba(255, 215, 0, 0.35);
+        }
+        .gold-btn:hover { transform: translateY(-2px); box-shadow: 0 0 30px rgba(255, 215, 0, 0.7); }
+
+        .emerald-btn {
+            background: linear-gradient(135deg, #00ff88, #00b368);
+            color: #020b08;
+            white-space: nowrap;
+        }
+        .emerald-btn:hover { box-shadow: 0 0 25px rgba(0, 255, 136, 0.7); transform: translateY(-2px); }
+
+        .or-separator {
+            position: relative;
+            border-top: 1px solid rgba(255, 215, 0, 0.25);
+            margin: 6px 0;
+        }
+        .or-separator span {
+            position: absolute;
+            top: -9px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: #091526;
+            padding: 0 10px;
+            font-size: 10px;
+            color: #ffd700;
+        }
+
+        .join-row { display: flex; gap: 8px; }
+        .join-row input { width: 45%; font-size: 22px; letter-spacing: 6px; }
+        .join-row button { width: 55%; }
+
+        #statusMsg { color: #88c0d0; font-size: 11px; letter-spacing: 1px; margin-top: 15px; }
+
+        /* Host 4-Digit Code Pop-up */
+        #hostModal {
+            display: none;
+            position: absolute;
+            top: 0; left: 0; width: 100vw; height: 100vh;
+            background: rgba(0, 4, 10, 0.85);
+            backdrop-filter: blur(10px);
+            z-index: 150;
+            justify-content: center;
+            align-items: center;
+        }
+        .modal-box {
+            background: #081422;
+            border: 2px solid #ffd700;
+            border-radius: 12px;
+            padding: 30px 40px;
+            text-align: center;
+            box-shadow: 0 0 40px rgba(255, 215, 0, 0.5);
+            max-width: 400px;
+            width: 90%;
+        }
+        .modal-header { font-family: 'Orbitron', sans-serif; color: #00ff88; font-size: 13px; letter-spacing: 3px; margin-bottom: 10px; }
+        #generatedCodeDisplay {
+            font-family: 'Orbitron', monospace;
+            font-size: 50px;
+            font-weight: 900;
+            letter-spacing: 10px;
+            color: #ffd700;
+            text-shadow: 0 0 25px rgba(255, 215, 0, 0.8);
+            background: rgba(0,0,0,0.5);
+            border: 1px dashed #ffd700;
+            border-radius: 8px;
+            padding: 15px 0;
+            margin: 15px 0;
+        }
+        .copy-btn { background: rgba(255, 215, 0, 0.15); border: 1px solid #ffd700; color: #ffd700; padding: 8px 18px; font-size: 13px; }
+        .copy-btn:hover { background: #ffd700; color: #000; }
+
+        /* Cockpit HUD */
+        #hud {
+            position: absolute;
+            top: 15px;
+            left: 20px;
+            pointer-events: none;
+            z-index: 10;
+        }
+        #squadBadge {
+            font-family: 'Orbitron', monospace;
+            font-size: 16px;
+            font-weight: 700;
+            color: #ffd700;
+            background: rgba(4, 12, 22, 0.85);
+            border-left: 3px solid #ffd700;
+            padding: 5px 12px;
+            text-shadow: 0 0 10px rgba(255, 215, 0, 0.6);
+            display: inline-block;
+        }
+        #atcChatter {
+            font-size: 12px;
+            color: #00ff88;
+            letter-spacing: 1.5px;
+            background: rgba(0,0,0,0.6);
+            padding: 3px 8px;
+            margin-top: 5px;
+            max-width: 420px;
+        }
+        .bar-title { font-size: 11px; color: #00ffcc; letter-spacing: 1.5px; margin-top: 10px; }
+        #healthBarBox {
+            width: 220px;
+            height: 12px;
+            border: 1px solid #00ffcc;
+            background: rgba(0,0,0,0.7);
+            margin-top: 2px;
+        }
+        #healthBar {
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, #00ff88, #00d9ff);
+            box-shadow: 0 0 10px #00ff88;
+            transition: width 0.1s ease-out;
+        }
+        #speedGauge, #altGauge, #landmarkBeacon {
+            margin-top: 4px;
+            font-size: 14px;
+            color: #ffd700;
+            text-shadow: 0 0 8px rgba(255, 215, 0, 0.5);
+            font-weight: 600;
+        }
+        #landmarkBeacon { color: #00ffcc; font-size: 13px; letter-spacing: 1.5px; }
+        .controls-hint {
+            margin-top: 8px;
+            font-size: 11px;
+            color: #ccc;
+            background: rgba(0,0,0,0.6);
+            padding: 4px 8px;
+            max-width: 440px;
+        }
+
+        /* 3D Crosshair */
+        #crosshair {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 70px;
+            height: 70px;
+            pointer-events: none;
+            z-index: 10;
+        }
+        .cross-diamond {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            border: 1.5px solid rgba(255, 215, 0, 0.5);
+            transform: rotate(45deg);
+        }
+        .cross-dot {
+            position: absolute;
+            top: 50%; left: 50%;
+            transform: translate(-50%, -50%);
+            width: 4px; height: 4px;
+            background: #00ff88;
+            border-radius: 50%;
+            box-shadow: 0 0 8px #00ff88;
+        }
+        .wing { position: absolute; top: 50%; width: 14px; height: 2px; background: #ffd700; }
+        .wing.left { left: -12px; }
+        .wing.right { right: -12px; }
+        #lockState {
+            position: absolute;
+            bottom: -22px;
+            left: 50%;
+            transform: translateX(-50%);
+            font-family: 'Orbitron', monospace;
+            font-size: 10px;
+            color: #ffd700;
+            white-space: nowrap;
+            letter-spacing: 1px;
+        }
+
+        #killFeed {
+            position: absolute;
+            top: 15px;
+            right: 20px;
+            width: 320px;
+            text-align: right;
+            pointer-events: none;
+            z-index: 50;
+        }
+        .kill-msg {
+            color: #ff3366;
+            font-size: 13px;
+            font-weight: 700;
+            margin-bottom: 5px;
+            background: rgba(10, 0, 5, 0.75);
+            border-right: 3px solid #ff3366;
+            padding: 4px 8px;
+        }
+
+        #notification {
+            position: absolute;
+            top: 22%;
+            width: 100%;
+            text-align: center;
+            font-family: 'Orbitron', sans-serif;
+            font-size: 26px;
+            font-weight: 900;
+            color: #ffd700;
+            text-shadow: 0 0 20px rgba(255, 215, 0, 0.9);
+            pointer-events: none;
+            z-index: 60;
+            opacity: 0;
+            transition: opacity 0.3s;
+        }
+
+        /* Admin / Cheats */
+        #settingsCog {
+            position: absolute; bottom: 15px; right: 15px;
+            font-size: 32px; cursor: pointer; z-index: 101;
+            background: rgba(5, 12, 22, 0.85); border: 1px solid #ffd700;
+            border-radius: 50%; padding: 8px;
+        }
+        #adminPanel { 
+            display: none; position: absolute; bottom: 80px; right: 15px; 
+            background: rgba(5, 12, 22, 0.96); padding: 18px; 
+            border: 2px solid #ffd700; border-radius: 8px; width: 250px; z-index: 100;
+            box-shadow: 0 0 30px rgba(255, 215, 0, 0.3);
+        }
+        .cheat-row { margin-bottom: 6px; }
+        .cheat-btn {
+            background: #0f1c2e; color: #fff; font-size: 11px;
+            padding: 8px; width: 100%; border: 1px solid #224466; border-radius: 4px;
+        }
+        .cheat-btn:hover { background: #ffd700; color: #000; }
+        .cheat-btn.active { background: #ff3366; color: white; border-color: white; }
+
+        /* Touch Controls */
+        #touchControls {
+            display: none;
+            position: absolute; bottom: 15px; left: 0; width: 100%;
+            height: 160px; z-index: 90;
+            pointer-events: none;
+        }
+        #stickLeft { position: absolute; bottom: 10px; left: 15px; pointer-events: auto; }
+        #stickRight { position: absolute; bottom: 10px; right: 15px; pointer-events: auto; display: flex; align-items: flex-end; gap: 12px; }
+        .touch-row { display: flex; justify-content: center; }
+        .t-btn {
+            width: 52px; height: 52px; background: rgba(5, 20, 35, 0.7);
+            border: 1px solid #00ff88; color: #00ff88; font-size: 20px;
+            border-radius: 8px; margin: 2px;
+        }
+        .round { border-radius: 50%; }
+        .big { width: 72px; height: 72px; font-size: 30px; background: rgba(255, 60, 60, 0.4); border-color: #ff3366; color: white; }
+        .sub-actions { display: flex; flex-direction: column; gap: 10px; }
+
+        @media (pointer: coarse) { #touchControls { display: block; } }
+    </style>
 </head>
 <body>
 
+    <!-- Main Dubai Scramble Menu -->
     <div id="menu">
-        <h1 class="glow">SKY BATTLE</h1>
-        
-        <input type="text" id="username" placeholder="PILOT NAME" maxlength="10">
-        <br><br>
+        <div class="dubai-emblem">دبي • DUBAI AIR DEFENSE</div>
+        <h1 class="glow-gold">SKY PATROL 3D</h1>
+        <div class="skyline-badge">BURJ KHALIFA • SHEIKH ZAYED RD • BURJ AL ARAB</div>
 
-        <button onclick="hostGame()">HOST MATCH</button>
-        <div class="divider"></div>
-        <input type="text" id="joinCode" maxlength="4" placeholder="ENTER 4-DIGIT CODE">
-        <br>
-        <button onclick="joinGame()">JOIN MATCH</button>
-        <p id="statusMsg">Ready to deploy</p>
+        <div class="input-block">
+            <label>PILOT CALLSIGN</label>
+            <input type="text" id="username" placeholder="CALLSIGN" maxlength="10" value="FALCON-1">
+        </div>
+
+        <div class="action-grid">
+            <button class="gold-btn" onclick="hostGame()">
+                ⚡ CREATE 4-DIGIT AIRSPACE
+            </button>
+            <div class="or-separator"><span>OR ENTER CODE</span></div>
+            <div class="join-row">
+                <input type="text" id="joinCode" maxlength="4" placeholder="••••" autocomplete="off" inputmode="numeric">
+                <button class="emerald-btn" onclick="joinGame()">SCRAMBLE JET</button>
+            </div>
+        </div>
+
+        <p id="statusMsg">STATUS: SENSORS ACTIVE • ALL SQUADRONS STANDBY</p>
     </div>
 
+    <!-- Host 4-Digit Code Pop-up -->
+    <div id="hostModal">
+        <div class="modal-box">
+            <div class="modal-header">DUBAI AIRSPACE ESTABLISHED</div>
+            <p style="font-size: 13px; color: #ccc;">SHARE THIS 4-DIGIT CODE WITH YOUR WINGMEN:</p>
+            <div id="generatedCodeDisplay">----</div>
+            <button class="copy-btn" onclick="copyCode()">📋 COPY CODE</button>
+            <br>
+            <button class="gold-btn" style="margin-top: 15px; width: 100%;" onclick="closeHostModalAndFly()">🚀 DEPLOY OVER DOWNTOWN DUBAI</button>
+        </div>
+    </div>
+
+    <!-- Cockpit HUD -->
     <div id="hud">
-        <div id="connectionStatus">Status: Offline</div>
+        <div id="squadBadge">AIRSPACE: <span id="hudCode">SOLO PATROL</span></div>
+        <div id="atcChatter">DUBAI ATC: RADAR ONLINE OVER BURJ KHALIFA</div>
+
+        <div class="flight-telemetry">
+            <div class="bar-title">JET SHIELD & HULL</div>
+            <div id="healthBarBox"><div id="healthBar"></div></div>
+            <div id="speedGauge">MACH 1.2 [AFTERBURNER: OFF]</div>
+            <div id="altGauge">ALT: 1,850 FT</div>
+            <div id="landmarkBeacon">OVERFLYING: DOWNTOWN DUBAI</div>
+        </div>
+
         <div class="controls-hint">
-            WASD: Fly | SHIFT: Boost | SPACE: Shoot | M: Missile
+            W/S: Pitch | A/D: Roll | Q/E: Rudder | SHIFT: Afterburner | SPACE: Cannons | M: Dubai Homing Missile
         </div>
-        <div id="healthBarBox">
-            <div id="healthBar"></div>
-        </div>
-        <div id="speedGauge">THRUST: 0%</div>
+    </div>
+
+    <!-- HUD Crosshair -->
+    <div id="crosshair">
+        <div class="cross-diamond"></div>
+        <div class="cross-dot"></div>
+        <div class="wing left"></div>
+        <div class="wing right"></div>
+        <div id="lockState">TRACKING AIRSPACE</div>
     </div>
 
     <div id="killFeed"></div>
-    
     <div id="notification"></div>
 
+    <!-- Touch Mobile Virtual Controls -->
     <div id="touchControls">
         <div id="stickLeft">
-            <div class="touch-row">
-                <button class="t-btn" id="btnW">▲</button>
-            </div>
+            <div class="touch-row"><button class="t-btn" id="btnW">▲</button></div>
             <div class="touch-row">
                 <button class="t-btn" id="btnA">◀</button>
                 <button class="t-btn" id="btnS">▼</button>
                 <button class="t-btn" id="btnD">▶</button>
             </div>
         </div>
-
         <div id="stickRight">
             <button class="t-btn round big" id="btnSpace">🔥</button>
             <div class="sub-actions">
-                <button class="t-btn round" id="btnShift">💨</button>
+                <button class="t-btn round" id="btnShift">⚡</button>
                 <button class="t-btn round" id="btnM">🚀</button>
-                <button class="t-btn round" id="btnL" style="display:none; border-color:cyan; color:cyan;">⚡</button>
+                <button class="t-btn round" id="btnL" style="display:none; border-color:#00ffff; color:#00ffff;">⚡</button>
             </div>
         </div>
     </div>
 
+    <!-- Dubai VIP Admin Control (PIN: 8007) -->
     <div id="settingsCog" onclick="toggleAdminPanel()">⚙️</div>
-
     <div id="adminPanel">
         <div style="display:flex; justify-content:space-between; align-items:center;">
-            <h3>ADMIN CONTROL</h3>
-            <button onclick="toggleAdminPanel()" style="padding:2px 8px; font-size:12px; margin:0; background:red;">X</button>
+            <h3 style="color:#ffd700; margin:0;">DUBAI VIP COMMAND</h3>
+            <button onclick="toggleAdminPanel()" style="background:#e74c3c; color:#fff; border:none; padding:2px 7px; cursor:pointer;">✕</button>
         </div>
-
-        <div id="loginSection">
-            <input type="password" id="adminPass" placeholder="ENTER PIN (8007)">
-            <button onclick="unlockAdmin()" class="cheat-btn">ACCESS</button>
+        <div id="loginSection" style="margin-top:10px;">
+            <input type="password" id="adminPass" placeholder="VIP PIN (8007)">
+            <button onclick="unlockAdmin()" class="cheat-btn" style="margin-top:5px;">ACCESS DEFENSE SUITE</button>
         </div>
-        <div id="cheatSection">
-            <div class="cheat-row"><button id="btnLaser" onclick="toggleCheat('laser')" class="cheat-btn">UNLOCK LASER (L)</button></div>
-            <div class="cheat-row"><button id="btnGod" onclick="toggleCheat('god')" class="cheat-btn">GOD MODE</button></div>
-            <div class="cheat-row"><button id="btnSpeed" onclick="toggleCheat('speed')" class="cheat-btn">SUPER SPEED</button></div>
-            <div class="cheat-row"><button id="btnRapid" onclick="toggleCheat('rapid')" class="cheat-btn">RAPID FIRE</button></div>
-            <div class="cheat-row"><button id="btnNuke" onclick="toggleCheat('nuke')" class="cheat-btn" style="border-color: red; color: red;">☢️ NUKE ALL ☢️</button></div>
+        <div id="cheatSection" style="margin-top:10px;">
+            <div class="cheat-row"><button id="btnLaser" onclick="toggleCheat('laser')" class="cheat-btn">⚡ EMIRATES ION BEAM (L)</button></div>
+            <div class="cheat-row"><button id="btnGod" onclick="toggleCheat('god')" class="cheat-btn">🛡️ ROYAL INVULNERABILITY</button></div>
+            <div class="cheat-row"><button id="btnSpeed" onclick="toggleCheat('speed')" class="cheat-btn">💨 HYPER-SONIC CRUISE</button></div>
+            <div class="cheat-row"><button id="btnRapid" onclick="toggleCheat('rapid')" class="cheat-btn">🔥 VULCAN OVERDRIVE</button></div>
+            <div class="cheat-row"><button id="btnNuke" onclick="toggleCheat('nuke')" class="cheat-btn" style="border-color:#ff3366; color:#ff3366;">☢️ DETONATE CITY EMP ☢️</button></div>
         </div>
     </div>
 
